@@ -884,14 +884,11 @@ async function load(){
     try{S.reviews=JSON.parse(localStorage.getItem('mck_reviews')||'[]');}catch(e){S.reviews=[];}
     try{S.onetoones=JSON.parse(localStorage.getItem('mck_onetoones')||'[]');}catch(e){S.onetoones=[];}
   }
-  if(!S.users.length) seedDemo();
+  // Only seed demo data in local dev mode (not on live Azure site)
+  if(!S.users.length && !_useAPI) seedDemo();
   // Migrations
   S.users.forEach(u=>{if(typeof u.isAdmin==='undefined')u.isAdmin=false;});
   S.materials.forEach(m=>{if(!Array.isArray(m.discTags))m.discTags=[];if(!Array.isArray(m.senTags))m.senTags=[];});
-  if(!S.users.some(u=>u.isAdmin)&&S.users.length){
-    const firstSenior=S.users.find(u=>/principal|director/i.test(u.role||''));
-    (firstSenior||S.users[0]).isAdmin=true;
-  }
   save();
 }
 function seedDemo(){
@@ -994,7 +991,8 @@ function completeSetup(){
   const disc=document.getElementById('setup-disc').value;
   if(!role||!disc){alert('Please select your role and discipline.');return;}
   // First user gets admin rights
-  const isFirstUser=S.users.length===0;
+  // Grant admin if nobody in the system has admin yet (first real user on live site)
+  const isFirstUser=S.users.length===0||!S.users.some(u=>u.isAdmin);
   const newUser={
     id:'u'+Date.now(),name:_msUser.name,email:_msUser.email,
     role,discipline:disc,experience:document.getElementById('setup-exp').value,
