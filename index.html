@@ -338,20 +338,48 @@ tr:last-child td{border-bottom:none}
   <div class="login-tagline">Developing great places and people</div>
   <div class="login-card">
     <h3>Sign in to McKenzie Growth</h3>
-    <div class="form-group">
-      <label class="form-label">Username</label>
-      <input class="form-input" id="login-user" placeholder="Enter your username" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <p style="color:var(--muted);font-size:.82rem;margin-bottom:18px;text-align:center">Use your McKenzie & Co. Microsoft account</p>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:.88rem;gap:10px" onclick="window.location.href='/.auth/login/aad?post_login_redirect_uri=/'">
+      <svg width="20" height="20" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Sign in with Microsoft
+    </button>
+    <div id="login-status" style="margin-top:14px;font-size:.78rem;color:var(--muted);text-align:center;display:none"></div>
+  </div>
+</div>
+
+<!-- First-time setup screen -->
+<div id="setup-screen" style="display:none">
+  <svg style="height:44px;width:auto;margin-bottom:4px"><use href="#mck-logo"/></svg>
+  <div class="login-tagline">Welcome! Let's set up your profile</div>
+  <div class="login-card" style="max-width:440px">
+    <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="setup-name" readonly/></div>
+    <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="setup-email" readonly/></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Role *</label>
+        <select class="form-select" id="setup-role">
+          <option value="">Select&hellip;</option>
+          <option>Graduate Engineer</option><option>Engineer</option><option>Senior Engineer</option><option>Principal Engineer</option>
+          <option>Graduate Surveyor</option><option>Surveyor</option><option>Senior Surveyor</option><option>Principal Surveyor</option>
+          <option>Project Manager</option><option>Director</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Discipline *</label>
+        <select class="form-select" id="setup-disc">
+          <option value="">Select&hellip;</option>
+          <option value="engineering">Engineering</option><option value="surveying">Surveying</option><option value="both">Both</option>
+        </select>
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Password</label>
-      <input class="form-input" id="login-pass" type="password" placeholder="Enter your password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Team</label><input class="form-input" id="setup-team" placeholder="e.g. Civil Engineering"/></div>
+      <div class="form-group"><label class="form-label">Experience</label>
+        <select class="form-select" id="setup-exp">
+          <option value="<1">Less than 1 year</option><option value="1-3">1–3 years</option>
+          <option value="3-5">3–5 years</option><option value="5-10">5–10 years</option><option value="10+">10+ years</option>
+        </select>
+      </div>
     </div>
-    <div id="login-error" style="color:var(--red);font-size:.78rem;display:none;margin-bottom:10px">Invalid username or password</div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;font-size:.86rem" onclick="doLogin()">Sign In</button>
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:center">
-      <div style="font-size:.72rem;color:var(--muted);margin-bottom:6px">Default credentials</div>
-      <div style="font-size:.7rem;color:var(--muted);font-family:monospace;background:var(--sand-pale);padding:6px 10px;border-radius:4px;display:inline-block;text-align:left;line-height:1.6" id="login-hints"></div>
-    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;font-size:.86rem;margin-top:8px" onclick="completeSetup()">Get Started</button>
   </div>
 </div>
 
@@ -463,15 +491,9 @@ tr:last-child td{border-bottom:none}
         <input class="form-input" id="np-chargerate" type="number" step="0.01" placeholder="e.g. 145.00"/>
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Login Username</label>
-        <input class="form-input" id="np-username" placeholder="e.g. alex.mitchell"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Login Password</label>
-        <input class="form-input" id="np-password" type="text" placeholder="e.g. password123"/>
-      </div>
+    <div class="form-group">
+      <label class="form-label">Email (Microsoft account)</label>
+      <input class="form-input" id="np-email" type="email" placeholder="e.g. sarah.chen@mckenzieco.co.nz"/>
     </div>
     <div class="form-group">
       <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -496,13 +518,13 @@ tr:last-child td{border-bottom:none}
     <div class="card" style="background:var(--sand-pale);border:none;padding:14px;margin-bottom:14px">
       <div style="font-size:.78rem;line-height:1.55">
         <strong>Required columns (in any order):</strong> Name, Role, Discipline<br/>
-        <strong>Optional:</strong> Experience, Team, Manager, Cost Rate, Charge Rate, Username, Password, Admin<br/>
+        <strong>Optional:</strong> Experience, Team, Manager, Cost Rate, Charge Rate, Email, Admin<br/>
         <div style="margin-top:8px;color:var(--muted)">
           • <strong>Discipline</strong>: engineering, surveying, or both<br/>
           • <strong>Experience</strong>: &lt;1, 1-3, 3-5, 5-10, or 10+<br/>
+          • <strong>Email</strong>: their Microsoft 365 email (auto-generated from name if blank)<br/>
           • <strong>Manager</strong>: full name of another staff member (matched after import)<br/>
-          • <strong>Admin</strong>: yes/true/1 grants admin rights<br/>
-          • Username/password auto-generated from name if blank
+          • <strong>Admin</strong>: yes/true/1 grants admin rights
         </div>
       </div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
@@ -517,8 +539,8 @@ tr:last-child td{border-bottom:none}
     </div>
     <div class="form-group">
       <label class="form-label">…or paste rows here (CSV or tab-separated from Excel)</label>
-      <textarea class="form-textarea" id="bulk-paste" rows="7" placeholder="Name,Role,Discipline,Experience,Team,Manager,Cost Rate,Charge Rate,Username,Password,Admin
-Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen,sarah123,yes" style="font-family:monospace;font-size:.78rem" oninput="previewBulkImport()"></textarea>
+      <textarea class="form-textarea" id="bulk-paste" rows="7" placeholder="Name,Role,Discipline,Experience,Team,Manager,Cost Rate,Charge Rate,Email,Admin
+Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen@mckenzieco.co.nz,yes" style="font-family:monospace;font-size:.78rem" oninput="previewBulkImport()"></textarea>
     </div>
 
     <div id="bulk-preview" style="display:none">
@@ -820,24 +842,49 @@ let S={currentUser:null,users:[],materials:[],assignments:[],reviews:[],onetoone
 let pendingFileData=null;
 
 // ══════════════════════════════════════════════════════════
-// PERSIST
+// PERSIST (Azure Cosmos DB via API, falls back to localStorage for local dev)
 // ══════════════════════════════════════════════════════════
+let _useAPI=false; // set to true once we confirm the API is available
+let _saveTimer=null;
+
 function save(){
+  // Always save to localStorage as cache
   localStorage.setItem('mck_users',JSON.stringify(S.users));
   localStorage.setItem('mck_materials',JSON.stringify(S.materials));
   localStorage.setItem('mck_assignments',JSON.stringify(S.assignments));
   localStorage.setItem('mck_reviews',JSON.stringify(S.reviews));
   localStorage.setItem('mck_onetoones',JSON.stringify(S.onetoones));
+  // Debounce API saves (300ms) so rapid changes don't flood the server
+  if(_useAPI){
+    clearTimeout(_saveTimer);
+    _saveTimer=setTimeout(()=>{
+      fetch('/api/saveData',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({users:S.users,materials:S.materials,assignments:S.assignments,reviews:S.reviews,onetoones:S.onetoones})
+      }).catch(err=>console.warn('API save failed, data safe in localStorage:',err));
+    },300);
+  }
 }
-function load(){
-  try{S.users=JSON.parse(localStorage.getItem('mck_users')||'[]');}catch(e){S.users=[];}
-  try{S.materials=JSON.parse(localStorage.getItem('mck_materials')||'[]');}catch(e){S.materials=[];}
-  try{S.assignments=JSON.parse(localStorage.getItem('mck_assignments')||'[]');}catch(e){S.assignments=[];}
-  try{S.reviews=JSON.parse(localStorage.getItem('mck_reviews')||'[]');}catch(e){S.reviews=[];}
-  try{S.onetoones=JSON.parse(localStorage.getItem('mck_onetoones')||'[]');}catch(e){S.onetoones=[];}
+async function load(){
+  // Try API first, fall back to localStorage
+  try{
+    const res=await fetch('/api/getData');
+    if(res.ok){
+      const data=await res.json();
+      S.users=data.users||[];S.materials=data.materials||[];
+      S.assignments=data.assignments||[];S.reviews=data.reviews||[];
+      S.onetoones=data.onetoones||[];
+      _useAPI=true;
+    }else throw new Error('API returned '+res.status);
+  }catch(e){
+    console.warn('API not available, using localStorage:',e.message);
+    try{S.users=JSON.parse(localStorage.getItem('mck_users')||'[]');}catch(e){S.users=[];}
+    try{S.materials=JSON.parse(localStorage.getItem('mck_materials')||'[]');}catch(e){S.materials=[];}
+    try{S.assignments=JSON.parse(localStorage.getItem('mck_assignments')||'[]');}catch(e){S.assignments=[];}
+    try{S.reviews=JSON.parse(localStorage.getItem('mck_reviews')||'[]');}catch(e){S.reviews=[];}
+    try{S.onetoones=JSON.parse(localStorage.getItem('mck_onetoones')||'[]');}catch(e){S.onetoones=[];}
+  }
   if(!S.users.length) seedDemo();
-  // Migration: ensure every user has an isAdmin field. If nobody is admin, promote
-  // the first principal/director, otherwise the first user, so the system stays usable.
+  // Migrations
   S.users.forEach(u=>{if(typeof u.isAdmin==='undefined')u.isAdmin=false;});
   S.materials.forEach(m=>{if(!Array.isArray(m.discTags))m.discTags=[];if(!Array.isArray(m.senTags))m.senTags=[];});
   if(!S.users.some(u=>u.isAdmin)&&S.users.length){
@@ -848,16 +895,16 @@ function load(){
 }
 function seedDemo(){
   S.users=[
-    {id:'u1',name:'Alex Mitchell',role:'Senior Engineer',discipline:'engineering',experience:'5-10',team:'Civil Engineering',manager:'',costRate:75,chargeRate:155,username:'alex.mitchell',password:'alex123',isAdmin:false,
+    {id:'u1',name:'Alex Mitchell',role:'Senior Engineer',discipline:'engineering',experience:'5-10',team:'Civil Engineering',manager:'',costRate:75,chargeRate:155,email:'alex.mitchell@mckenzieco.co.nz',username:'alex.mitchell',password:'',isAdmin:false,
      goals:[{id:'g1',title:'Achieve CPEng',desc:'Complete Engineers Australia CPEng assessment',category:'Certification',timeframe:'medium',priority:'high',status:'in-progress',skills:'Technical Report Writing, Project Management'},{id:'g2',title:'Master Revit / BIM',desc:'Become proficient in BIM workflows',category:'Software',timeframe:'short',priority:'high',status:'in-progress',skills:'Revit / BIM'}],
      skills:{'AutoCAD':4,'Structural Analysis & Design':4,'Technical Report Writing':3,'Project Management':3,'Revit / BIM':2,'Risk Assessment & Management':3,'Australian Standards (AS)':4,'WHS / Safety Legislation':3,'Team Leadership & Mentoring':2,'Client & Stakeholder Communication':3,'AutoCAD Civil 3D':2}},
-    {id:'u2',name:'Priya Sharma',role:'Surveyor',discipline:'surveying',experience:'3-5',team:'Survey Operations',manager:'u4',costRate:55,chargeRate:120,username:'priya.sharma',password:'priya123',isAdmin:false,
+    {id:'u2',name:'Priya Sharma',role:'Surveyor',discipline:'surveying',experience:'3-5',team:'Survey Operations',manager:'u4',costRate:55,chargeRate:120,email:'priya.sharma@mckenzieco.co.nz',username:'priya.sharma',password:'',isAdmin:false,
      goals:[{id:'g4',title:'Gain drone pilot cert',desc:'CASA certification',category:'Certification',timeframe:'short',priority:'high',status:'in-progress',skills:'UAV / Drone Surveys,DroneDeploy / Pix4D'},{id:'g5',title:'LiDAR proficiency',desc:'TLS and point cloud workflows',category:'Technical',timeframe:'medium',priority:'medium',status:'not-started',skills:'LiDAR / Terrestrial Scanning'}],
      skills:{'GNSS / GPS Surveying':4,'Total Station Operations':4,'Differential Levelling':3,'UAV / Drone Surveys':2,'Cadastral Surveying':3,'AutoCAD Civil 3D':3,'Trimble Business Center':3,'Survey Report Writing':3,'WHS / Safety Legislation':3,'LiDAR / Terrestrial Scanning':1,'DroneDeploy / Pix4D':1}},
-    {id:'u3',name:'Jordan Wells',role:'Graduate Engineer',discipline:'engineering',experience:'1-3',team:'Civil Engineering',manager:'u1',costRate:40,chargeRate:85,username:'jordan.wells',password:'jordan123',isAdmin:false,
+    {id:'u3',name:'Jordan Wells',role:'Graduate Engineer',discipline:'engineering',experience:'1-3',team:'Civil Engineering',manager:'u1',costRate:40,chargeRate:85,email:'jordan.wells@mckenzieco.co.nz',username:'jordan.wells',password:'',isAdmin:false,
      goals:[{id:'g6',title:'AutoCAD proficiency',desc:'Productive in AutoCAD for 2D civil',category:'Software',timeframe:'short',priority:'high',status:'in-progress',skills:'AutoCAD'},{id:'g7',title:'Graduate training program',desc:'Meet EA graduate competencies',category:'Professional',timeframe:'long',priority:'high',status:'in-progress',skills:'Technical Report Writing, Project Management'}],
      skills:{'AutoCAD':2,'Structural Analysis & Design':2,'Technical Report Writing':2,'Project Management':1,'Revit / BIM':1,'Australian Standards (AS)':2,'WHS / Safety Legislation':2}},
-    {id:'u4',name:'Sarah Chen',role:'Principal Surveyor',discipline:'surveying',experience:'10+',team:'Survey Operations',manager:'',costRate:95,chargeRate:195,username:'sarah.chen',password:'sarah123',isAdmin:true,
+    {id:'u4',name:'Sarah Chen',role:'Principal Surveyor',discipline:'surveying',experience:'10+',team:'Survey Operations',manager:'',costRate:95,chargeRate:195,email:'sarah.chen@mckenzieco.co.nz',username:'sarah.chen',password:'',isAdmin:true,
      goals:[{id:'g8',title:'Build team capability',desc:'Uplift the survey team skill base',category:'Leadership',timeframe:'medium',priority:'high',status:'in-progress',skills:'Team Leadership & Mentoring'}],
      skills:{'GNSS / GPS Surveying':5,'Total Station Operations':5,'Cadastral Surveying':5,'UAV / Drone Surveys':4,'LiDAR / Terrestrial Scanning':4,'Trimble Business Center':5,'Survey Report Writing':5,'WHS / Safety Legislation':4,'Team Leadership & Mentoring':4,'Field Safety Management':5}},
   ];
@@ -882,31 +929,95 @@ function seedDemo(){
 }
 
 // ══════════════════════════════════════════════════════════
-// LOGIN
+// LOGIN (Microsoft SSO via Azure Static Web Apps)
 // ══════════════════════════════════════════════════════════
+let _msUser=null; // {name, email} from Microsoft
+
 function showLoginScreen(){
   document.getElementById('login-screen').classList.add('open');
-  // Show hints (mark admins)
-  document.getElementById('login-hints').textContent=S.users.map(u=>`${u.username} / ${u.password}${u.isAdmin?'  (admin)':''}`).join('\n');
+  document.getElementById('setup-screen').style.display='none';
 }
-function doLogin(){
-  const user=document.getElementById('login-user').value.trim().toLowerCase();
-  const pass=document.getElementById('login-pass').value;
-  // User login
-  const found=S.users.find(u=>u.username===user&&u.password===pass);
-  if(found){
-    document.getElementById('login-screen').classList.remove('open');
-    document.getElementById('login-error').style.display='none';
-    S.adminUnlocked=!!found.isAdmin;
-    selectUser(found.id);
-    return;
+
+async function checkMicrosoftAuth(){
+  try{
+    const res=await fetch('/.auth/me');
+    if(!res.ok)return null;
+    const data=await res.json();
+    const p=data.clientPrincipal;
+    if(!p)return null;
+    const name=(p.claims||[]).find(c=>c.typ==='name'||c.typ==='http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name');
+    const email=p.userDetails||'';
+    return {name:name?name.val:email.split('@')[0],email:email.toLowerCase()};
+  }catch(e){
+    console.warn('Auth check failed (local dev mode):',e.message);
+    return null;
   }
-  document.getElementById('login-error').style.display='block';
 }
+
+async function doMicrosoftLogin(){
+  _msUser=await checkMicrosoftAuth();
+  if(!_msUser){
+    // Not authenticated — show login screen (button redirects to /.auth/login/aad)
+    // In local dev, fall back to a simple prompt
+    if(location.hostname==='localhost'||location.hostname==='127.0.0.1'){
+      const name=prompt('Local dev mode — enter your name:','James Kitchen');
+      if(!name)return showLoginScreen();
+      _msUser={name,email:name.toLowerCase().replace(/\s+/g,'.')+'@mckenzieco.co.nz'};
+    }else{
+      return showLoginScreen();
+    }
+  }
+
+  // We have a Microsoft identity — load data and find/create their profile
+  await load();
+  const existing=S.users.find(u=>u.email===_msUser.email);
+  if(existing){
+    // Existing user — log them in
+    document.getElementById('login-screen').classList.remove('open');
+    document.getElementById('setup-screen').style.display='none';
+    S.adminUnlocked=!!existing.isAdmin;
+    selectUser(existing.id);
+    navigate('dashboard',document.querySelector('[data-view=dashboard]'));
+  }else{
+    // First-time user — show setup screen
+    document.getElementById('login-screen').classList.remove('open');
+    document.getElementById('setup-screen').style.display='';
+    document.getElementById('setup-name').value=_msUser.name;
+    document.getElementById('setup-email').value=_msUser.email;
+  }
+}
+
+function completeSetup(){
+  const role=document.getElementById('setup-role').value;
+  const disc=document.getElementById('setup-disc').value;
+  if(!role||!disc){alert('Please select your role and discipline.');return;}
+  // First user gets admin rights
+  const isFirstUser=S.users.length===0;
+  const newUser={
+    id:'u'+Date.now(),name:_msUser.name,email:_msUser.email,
+    role,discipline:disc,experience:document.getElementById('setup-exp').value,
+    team:document.getElementById('setup-team').value.trim(),
+    manager:'',costRate:0,chargeRate:0,
+    username:_msUser.email,password:'',isAdmin:isFirstUser,
+    goals:[],skills:{},
+  };
+  S.users.push(newUser);save();
+  document.getElementById('setup-screen').style.display='none';
+  S.adminUnlocked=isFirstUser;
+  selectUser(newUser.id);
+  updateAdminNav();
+  navigate('dashboard',document.querySelector('[data-view=dashboard]'));
+}
+
 function logout(){
   S.currentUser=null;S.adminUnlocked=false;
-  updateHeader();
-  showLoginScreen();
+  updateHeader();updateAdminNav();
+  // Redirect to Azure SWA logout, then back to home
+  if(_useAPI){
+    window.location.href='/.auth/logout?post_logout_redirect_uri=/';
+  }else{
+    showLoginScreen();
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -962,7 +1073,7 @@ function myAssignments(){return S.currentUser?S.assignments.filter(a=>a.userId==
 function openNewProfileModal(){
   document.getElementById('mp-title').textContent='Create Profile';
   document.getElementById('np-edit-id').value='';
-  ['np-name','np-team','np-username','np-password'].forEach(id=>document.getElementById(id).value='');
+  ['np-name','np-team','np-email'].forEach(id=>document.getElementById(id).value='');
   ['np-role','np-disc'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('np-exp').value='<1';
   document.getElementById('np-costrate').value='';document.getElementById('np-chargerate').value='';
@@ -982,8 +1093,7 @@ function saveProfile(){
   if(!name||!role||!disc){alert('Name, role and discipline are required.');return;}
   const editId=document.getElementById('np-edit-id').value;
   const existing=editId?S.users.find(u=>u.id===editId):null;
-  const username=document.getElementById('np-username').value.trim()||name.toLowerCase().replace(/\s+/g,'.');
-  const password=document.getElementById('np-password').value||name.split(' ')[0].toLowerCase()+'123';
+  const email=document.getElementById('np-email').value.trim().toLowerCase();
   const prof={
     id:editId||'u'+Date.now(),name,role,discipline:disc,
     experience:document.getElementById('np-exp').value,
@@ -991,7 +1101,7 @@ function saveProfile(){
     manager:document.getElementById('np-manager').value,
     costRate:parseFloat(document.getElementById('np-costrate').value)||0,
     chargeRate:parseFloat(document.getElementById('np-chargerate').value)||0,
-    username,password,
+    email,username:email,password:'',
     isAdmin:document.getElementById('np-isadmin').checked,
     goals:existing?existing.goals||[]:[],
     skills:existing?existing.skills||{}:{},
@@ -1211,7 +1321,7 @@ function renderAdmin(){if(!S.adminUnlocked){document.getElementById('view-admin'
   ({staff:renderAdminStaff,materials:renderAdminMats,matrix:renderAdminMatrix,orgchart:renderAdminOrg,rates:renderAdminRates,optimise:renderAdminOptimise,allreviews:renderAdminReviews,data:renderAdminData})[adminTab]?.(c);
 }
 
-function renderAdminStaff(el){el.innerHTML=`<div class="section-header"><h3>Staff (${S.users.length})</h3><div class="ml-auto" style="display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="openBulkImport()">⇪ Bulk Import</button><button class="btn btn-primary btn-sm" onclick="openNewProfileModal()">+ Add</button></div></div><table><thead><tr><th>Name</th><th>Role</th><th>Team</th><th>Username</th><th>Admin</th><th>Skills</th><th>Actions</th></tr></thead><tbody>${S.users.map(u=>`<tr><td><strong>${u.name}</strong></td><td>${u.role}</td><td>${u.team||'—'}</td><td><code style="font-size:.72rem;background:var(--sand-pale);padding:2px 6px;border-radius:3px">${u.username||'—'}</code></td><td>${u.isAdmin?'<span class="badge badge-green">Admin</span>':'<span class="text-muted" style="font-size:.75rem">—</span>'}</td><td>${Object.keys(u.skills||{}).length}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="editProfile('${u.id}')">Edit</button> <button class="btn btn-secondary btn-sm" onclick="switchToUser('${u.id}')">Switch</button> <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Del</button></td></tr>`).join('')}</tbody></table><div class="card mt-4"><div class="section-header"><h3>Assignments (${S.assignments.length})</h3></div><table><thead><tr><th>Material</th><th>To</th><th>By</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${S.assignments.length?S.assignments.map(a=>{const mat=S.materials.find(m=>m.id===a.matId)||{title:'Deleted'};const usr=S.users.find(u=>u.id===a.userId)||{name:'?'};return`<tr><td>${mat.title}</td><td>${usr.name}</td><td>${a.assignedBy}</td><td>${a.dueDate||'—'}</td><td><span class="badge ${a.status==='completed'?'badge-green':'badge-amber'}">${cap(a.status)}</span></td><td><button class="btn btn-danger btn-sm" onclick="removeAssignment('${a.id}')">✕</button></td></tr>`;}).join(''):'<tr><td colspan="6" class="text-muted" style="text-align:center">None</td></tr>'}</tbody></table></div>`;}
+function renderAdminStaff(el){el.innerHTML=`<div class="section-header"><h3>Staff (${S.users.length})</h3><div class="ml-auto" style="display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="openBulkImport()">⇪ Bulk Import</button><button class="btn btn-primary btn-sm" onclick="openNewProfileModal()">+ Add</button></div></div><table><thead><tr><th>Name</th><th>Role</th><th>Team</th><th>Email</th><th>Admin</th><th>Skills</th><th>Actions</th></tr></thead><tbody>${S.users.map(u=>`<tr><td><strong>${u.name}</strong></td><td>${u.role}</td><td>${u.team||'—'}</td><td><code style="font-size:.72rem;background:var(--sand-pale);padding:2px 6px;border-radius:3px">${u.email||u.username||'—'}</code></td><td>${u.isAdmin?'<span class="badge badge-green">Admin</span>':'<span class="text-muted" style="font-size:.75rem">—</span>'}</td><td>${Object.keys(u.skills||{}).length}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="editProfile('${u.id}')">Edit</button> <button class="btn btn-secondary btn-sm" onclick="switchToUser('${u.id}')">Switch</button> <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Del</button></td></tr>`).join('')}</tbody></table><div class="card mt-4"><div class="section-header"><h3>Assignments (${S.assignments.length})</h3></div><table><thead><tr><th>Material</th><th>To</th><th>By</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${S.assignments.length?S.assignments.map(a=>{const mat=S.materials.find(m=>m.id===a.matId)||{title:'Deleted'};const usr=S.users.find(u=>u.id===a.userId)||{name:'?'};return`<tr><td>${mat.title}</td><td>${usr.name}</td><td>${a.assignedBy}</td><td>${a.dueDate||'—'}</td><td><span class="badge ${a.status==='completed'?'badge-green':'badge-amber'}">${cap(a.status)}</span></td><td><button class="btn btn-danger btn-sm" onclick="removeAssignment('${a.id}')">✕</button></td></tr>`;}).join(''):'<tr><td colspan="6" class="text-muted" style="text-align:center">None</td></tr>'}</tbody></table></div>`;}
 
 function renderAdminMats(el){const tmp=document.getElementById('view-materials');renderMaterials();el.innerHTML=tmp.innerHTML;tmp.innerHTML='';}
 function renderAdminMatrix(el){const tmp=document.getElementById('view-matrix');renderMatrix();el.innerHTML=tmp.innerHTML;tmp.innerHTML='';}
@@ -1271,6 +1381,7 @@ const BULK_FIELD_ALIASES={
   manager:['manager','reports to','line manager','supervisor'],
   costRate:['cost rate','cost','cost/hr','cost rate ($/hr)','costrate','hourly cost'],
   chargeRate:['charge rate','charge','charge-out rate','chargeout','charge rate ($/hr)','chargerate','bill rate','billing rate'],
+  email:['email','e-mail','email address','microsoft account','microsoft email'],
   username:['username','user','login','user id'],
   password:['password','pass','pwd'],
   isAdmin:['admin','is admin','administrator','admin rights'],
@@ -1319,14 +1430,15 @@ function parseBulkData(text){
     const exp=['<1','1-3','3-5','5-10','10+'].includes(expRaw)?expRaw:'1-3';
     const adminRaw=get('isAdmin').toLowerCase();
     const isAdmin=['yes','y','true','1','admin'].includes(adminRaw);
+    const emailVal=get('email')||get('username')||name.toLowerCase().replace(/\s+/g,'.')+'@mckenzieco.co.nz';
     rows.push({
       name,role,discipline:disc,experience:exp,
       team:get('team'),
       managerName:get('manager'),
       costRate:parseFloat(get('costRate'))||0,
       chargeRate:parseFloat(get('chargeRate'))||0,
-      username:get('username')||name.toLowerCase().replace(/\s+/g,'.'),
-      password:get('password')||name.split(' ')[0].toLowerCase()+'123',
+      email:emailVal.toLowerCase(),
+      username:emailVal.toLowerCase(),password:'',
       isAdmin,
     });
   }
@@ -1349,11 +1461,11 @@ function handleBulkFile(e){
   reader.readAsText(file);
 }
 function loadSampleBulkData(){
-  document.getElementById('bulk-paste').value=`Name,Role,Discipline,Experience,Team,Manager,Cost Rate,Charge Rate,Username,Password,Admin
-Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen,sarah123,yes
-Alex Mitchell,Senior Engineer,engineering,5-10,Civil Engineering,,75,155,alex.mitchell,alex123,no
-Priya Sharma,Surveyor,surveying,3-5,Survey Operations,Sarah Chen,55,120,,,no
-Jordan Wells,Graduate Engineer,engineering,1-3,Civil Engineering,Alex Mitchell,40,85,,,no`;
+  document.getElementById('bulk-paste').value=`Name,Role,Discipline,Experience,Team,Manager,Cost Rate,Charge Rate,Email,Admin
+Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen@mckenzieco.co.nz,yes
+Alex Mitchell,Senior Engineer,engineering,5-10,Civil Engineering,,75,155,alex.mitchell@mckenzieco.co.nz,no
+Priya Sharma,Surveyor,surveying,3-5,Survey Operations,Sarah Chen,55,120,priya.sharma@mckenzieco.co.nz,no
+Jordan Wells,Graduate Engineer,engineering,1-3,Civil Engineering,Alex Mitchell,40,85,jordan.wells@mckenzieco.co.nz,no`;
   previewBulkImport();
 }
 function previewBulkImport(){
@@ -1363,13 +1475,13 @@ function previewBulkImport(){
   const {rows,errors}=bulkParsed;
   const preview=document.getElementById('bulk-preview');
   preview.style.display='';
-  const existingUsernames=new Set(S.users.map(u=>u.username));
-  document.getElementById('bulk-preview-body').innerHTML=rows.length?`<table style="width:100%;font-size:.74rem"><thead><tr><th>Name</th><th>Role</th><th>Disc</th><th>Team</th><th>Manager</th><th>Cost</th><th>Charge</th><th>Username</th><th>Admin</th><th>Status</th></tr></thead><tbody>${rows.map(r=>{const dup=existingUsernames.has(r.username);return`<tr><td><strong>${esc(r.name)}</strong></td><td>${esc(r.role)}</td><td>${r.discipline}</td><td>${esc(r.team)||'—'}</td><td>${esc(r.managerName)||'—'}</td><td>$${r.costRate}</td><td>$${r.chargeRate}</td><td><code style="font-size:.7rem">${r.username}</code></td><td>${r.isAdmin?'<span class="badge badge-green">Admin</span>':'—'}</td><td>${dup?'<span class="badge badge-amber">Update</span>':'<span class="badge badge-green">New</span>'}</td></tr>`;}).join('')}</tbody></table>`:'<div style="padding:12px;color:var(--muted);font-size:.78rem">No valid rows.</div>';
-  const newCount=rows.filter(r=>!existingUsernames.has(r.username)).length;
+  const existingEmails=new Set(S.users.map(u=>(u.email||u.username||'').toLowerCase()));
+  document.getElementById('bulk-preview-body').innerHTML=rows.length?`<table style="width:100%;font-size:.74rem"><thead><tr><th>Name</th><th>Role</th><th>Disc</th><th>Team</th><th>Manager</th><th>Cost</th><th>Charge</th><th>Email</th><th>Admin</th><th>Status</th></tr></thead><tbody>${rows.map(r=>{const dup=existingEmails.has(r.email);return`<tr><td><strong>${esc(r.name)}</strong></td><td>${esc(r.role)}</td><td>${r.discipline}</td><td>${esc(r.team)||'—'}</td><td>${esc(r.managerName)||'—'}</td><td>$${r.costRate}</td><td>$${r.chargeRate}</td><td><code style="font-size:.7rem">${r.email}</code></td><td>${r.isAdmin?'<span class="badge badge-green">Admin</span>':'—'}</td><td>${dup?'<span class="badge badge-amber">Update</span>':'<span class="badge badge-green">New</span>'}</td></tr>`;}).join('')}</tbody></table>`:'<div style="padding:12px;color:var(--muted);font-size:.78rem">No valid rows.</div>';
+  const newCount=rows.filter(r=>!existingEmails.has(r.email)).length;
   const updCount=rows.length-newCount;
   const parts=[];
   if(newCount)parts.push(`<span style="color:var(--moss);font-weight:600">${newCount} new</span>`);
-  if(updCount)parts.push(`<span style="color:#8a6a10;font-weight:600">${updCount} update existing (by username)</span>`);
+  if(updCount)parts.push(`<span style="color:#8a6a10;font-weight:600">${updCount} update existing (by email)</span>`);
   if(errors.length)parts.push(`<span style="color:var(--red);font-weight:600">${errors.length} error${errors.length>1?'s':''}</span>`);
   document.getElementById('bulk-summary').innerHTML=parts.join(' · ')+(errors.length?`<div style="margin-top:6px;color:var(--red);font-size:.72rem;font-family:monospace;white-space:pre-wrap">${errors.map(esc).join('\n')}</div>`:'');
   const btn=document.getElementById('bulk-import-btn');
@@ -1380,25 +1492,25 @@ function executeBulkImport(){
   const {rows,errors}=bulkParsed;
   if(!rows.length)return;
   if(errors.length&&!confirm(`${errors.length} row(s) had errors and will be skipped. Import the remaining ${rows.length} valid rows?`))return;
-  const byUsername={};S.users.forEach(u=>{byUsername[u.username]=u;});
+  const byEmail={};S.users.forEach(u=>{byEmail[(u.email||u.username||'').toLowerCase()]=u;});
   const byName={};S.users.forEach(u=>{byName[u.name.toLowerCase()]=u;});
   let created=0,updated=0;
   // First pass: create/update users (without resolving manager yet)
   const newUsers=[];
   rows.forEach(r=>{
-    const existing=byUsername[r.username];
+    const existing=byEmail[r.email];
     if(existing){
       Object.assign(existing,{
         name:r.name,role:r.role,discipline:r.discipline,experience:r.experience,
-        team:r.team,costRate:r.costRate,chargeRate:r.chargeRate,
-        password:r.password||existing.password,isAdmin:r.isAdmin,
+        team:r.team,costRate:r.costRate,chargeRate:r.chargeRate,email:r.email,
+        isAdmin:r.isAdmin,
       });
       existing._managerName=r.managerName;
       updated++;
     }else{
       const u={id:'u'+Date.now()+Math.floor(Math.random()*1000),name:r.name,role:r.role,discipline:r.discipline,
         experience:r.experience,team:r.team,manager:'',costRate:r.costRate,chargeRate:r.chargeRate,
-        username:r.username,password:r.password,isAdmin:r.isAdmin,goals:[],skills:{},
+        email:r.email,username:r.email,password:'',isAdmin:r.isAdmin,goals:[],skills:{},
         _managerName:r.managerName};
       S.users.push(u);newUsers.push(u);created++;
     }
@@ -1420,15 +1532,15 @@ function executeBulkImport(){
   renderAdmin();
 }
 function downloadStaffTemplate(){
-  const csv=`Name,Role,Discipline,Experience,Team,Manager,Cost Rate,Charge Rate,Username,Password,Admin
-Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen,sarah123,yes
-Alex Mitchell,Senior Engineer,engineering,5-10,Civil Engineering,,75,155,alex.mitchell,alex123,no
-Priya Sharma,Surveyor,surveying,3-5,Survey Operations,Sarah Chen,55,120,,,no`;
+  const csv=`Name,Role,Discipline,Experience,Team,Manager,Cost Rate,Charge Rate,Email,Admin
+Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen@mckenzieco.co.nz,yes
+Alex Mitchell,Senior Engineer,engineering,5-10,Civil Engineering,,75,155,alex.mitchell@mckenzieco.co.nz,no
+Priya Sharma,Surveyor,surveying,3-5,Survey Operations,Sarah Chen,55,120,priya.sharma@mckenzieco.co.nz,no`;
   const blob=new Blob([csv],{type:'text/csv'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mckenzie-growth-staff-template.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 
-function editProfile(id){const u=S.users.find(x=>x.id===id);if(!u)return;document.getElementById('mp-title').textContent='Edit Profile';document.getElementById('np-edit-id').value=id;document.getElementById('np-name').value=u.name;document.getElementById('np-role').value=u.role;document.getElementById('np-disc').value=u.discipline;document.getElementById('np-exp').value=u.experience;document.getElementById('np-team').value=u.team||'';document.getElementById('np-costrate').value=u.costRate||'';document.getElementById('np-chargerate').value=u.chargeRate||'';document.getElementById('np-username').value=u.username||'';document.getElementById('np-password').value=u.password||'';document.getElementById('np-isadmin').checked=!!u.isAdmin;populateManagerDropdown(id);document.getElementById('np-manager').value=u.manager||'';document.getElementById('modal-profile').classList.add('open');}
+function editProfile(id){const u=S.users.find(x=>x.id===id);if(!u)return;document.getElementById('mp-title').textContent='Edit Profile';document.getElementById('np-edit-id').value=id;document.getElementById('np-name').value=u.name;document.getElementById('np-role').value=u.role;document.getElementById('np-disc').value=u.discipline;document.getElementById('np-exp').value=u.experience;document.getElementById('np-team').value=u.team||'';document.getElementById('np-costrate').value=u.costRate||'';document.getElementById('np-chargerate').value=u.chargeRate||'';document.getElementById('np-email').value=u.email||'';document.getElementById('np-isadmin').checked=!!u.isAdmin;populateManagerDropdown(id);document.getElementById('np-manager').value=u.manager||'';document.getElementById('modal-profile').classList.add('open');}
 function switchToUser(id){selectUser(id);navigate('dashboard',document.querySelector('[data-view=dashboard]'));}
 function deleteUser(id){if(!confirm('Delete?'))return;S.users=S.users.filter(u=>u.id!==id);S.assignments=S.assignments.filter(a=>a.userId!==id);S.reviews=S.reviews.filter(r=>r.userId!==id);S.onetoones=S.onetoones.filter(o=>o.userId!==id&&o.withId!==id);if(S.currentUser&&S.currentUser.id===id){S.currentUser=null;S.adminUnlocked=false;updateHeader();updateAdminNav();}save();renderAdmin();}
 function removeAssignment(id){if(!confirm('Remove?'))return;S.assignments=S.assignments.filter(a=>a.id!==id);save();updateAssignedBadge();renderAdmin();}
@@ -1455,8 +1567,11 @@ document.addEventListener('click',e=>{if(e.target.classList.contains('modal-over
 // ══════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════
-load();
-showLoginScreen();
+(async function init(){
+  document.getElementById('login-status').style.display='';
+  document.getElementById('login-status').textContent='Checking sign-in...';
+  await doMicrosoftLogin();
+})();
 </script>
 </body>
 </html>
