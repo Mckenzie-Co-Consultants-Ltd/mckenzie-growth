@@ -364,6 +364,8 @@ tr:last-child td{border-bottom:none}
   <div class="nav-item" data-view="reviews" onclick="navigate('reviews',this)"><span class="icon">📝</span> Reviews</div>
   <div class="nav-item" data-view="onetoones" onclick="navigate('onetoones',this)"><span class="icon">🤝</span> One-to-Ones</div>
   <div class="nav-item" data-view="experts" onclick="navigate('experts',this)"><span class="icon">🏆</span> Experts</div>
+  <div class="nav-section exec-only" style="display:none">Management</div>
+  <div class="nav-item exec-only" data-view="myteam" onclick="navigate('myteam',this)" style="display:none"><span class="icon">👥</span> My Team</div>
   <div class="nav-section admin-only" style="display:none">Admin</div>
   <div class="nav-item admin-only" data-view="admin" onclick="navigate('admin',this)" style="display:none"><span class="icon">🔐</span> Admin Panel</div>
 </div>
@@ -381,6 +383,7 @@ tr:last-child td{border-bottom:none}
   <div id="view-materials" style="display:none"></div>
   <div id="view-matrix" style="display:none"></div>
   <div id="view-admin" style="display:none"></div>
+  <div id="view-myteam" class="view" style="display:none"></div>
 </div>
 
 <!-- Modal: New/Edit Profile -->
@@ -1031,6 +1034,8 @@ function selectUser(id){
 function updateAdminNav(){
   const show=S.adminUnlocked;
   document.querySelectorAll('.admin-only').forEach(el=>{el.style.display=show?'':'none';});
+  const myReports=S.currentUser?S.users.filter(u=>u.manager===S.currentUser.id):[];
+  document.querySelectorAll('.exec-only').forEach(el=>{el.style.display=myReports.length?'':'none';});
 }
 function updateHeader(){
   if(!S.currentUser){document.getElementById('hdr-avatar').textContent='?';document.getElementById('hdr-name').textContent='Select Profile';document.getElementById('hdr-role').textContent='—';return;}
@@ -1104,13 +1109,13 @@ function navigate(view,el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   else document.querySelectorAll('.nav-item').forEach(n=>{if(n.dataset.view===view)n.classList.add('active');});
-  const views=['dashboard','goals','skills','training','mycourses','reviews','onetoones','experts','materials','matrix','admin'];
+  const views=['dashboard','goals','skills','training','mycourses','reviews','onetoones','experts','materials','matrix','admin','myteam'];
   views.forEach(v=>document.getElementById('view-'+v).style.display=v===view?'':'none');
   renderView(view);
 }
 function renderAll(){renderView(S.view);}
 function renderView(v){
-  const m={dashboard:renderDashboard,goals:renderGoals,skills:renderSkills,training:renderTraining,mycourses:renderMyCourses,reviews:renderReviews,onetoones:renderOneToOnes,experts:renderExperts,materials:renderMaterials,matrix:renderMatrix,admin:renderAdmin};
+  const m={dashboard:renderDashboard,goals:renderGoals,skills:renderSkills,training:renderTraining,mycourses:renderMyCourses,reviews:renderReviews,onetoones:renderOneToOnes,experts:renderExperts,materials:renderMaterials,matrix:renderMatrix,admin:renderAdmin,myteam:renderMyTeam};
   if(m[v])m[v]();
 }
 
@@ -1444,6 +1449,132 @@ function executePush(){const matId=document.getElementById('push-mat-id').value;
 // ══════════════════════════════════════════════════════════
 function renderMatrix(){const users=S.users;if(!users.length){document.getElementById('view-matrix').innerHTML='<div class="empty-state"><p>No staff yet.</p></div>';return;}const allSkills=[...new Set(users.flatMap(u=>Object.keys(u.skills||{})))].sort();const skillAvgs={};allSkills.forEach(s=>{const vals=users.map(u=>(u.skills||{})[s]).filter(Boolean);skillAvgs[s]=vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):null;});const criticalGaps=allSkills.filter(s=>skillAvgs[s]&&parseFloat(skillAvgs[s])<2.5);const teams=[...new Set(users.map(u=>u.team||'No Team'))].sort();const byTeam={};teams.forEach(t=>{byTeam[t]=users.filter(u=>(u.team||'No Team')===t);});
   document.getElementById('view-matrix').innerHTML=`<div class="page-title">Company Skills Matrix</div><div class="page-sub">${users.length} staff · ${allSkills.length} skills · Admin view</div><div class="stat-grid"><div class="stat-card accent"><div class="s-label">Staff</div><div class="s-value">${users.length}</div></div><div class="stat-card accent3"><div class="s-label">Skills</div><div class="s-value">${allSkills.length}</div></div><div class="stat-card accent5"><div class="s-label">Critical Gaps</div><div class="s-value">${criticalGaps.length}</div><div class="s-note">avg &lt; 2.5</div></div></div>${criticalGaps.length?`<div class="card mb-6" style="border-left:3px solid var(--red)"><div class="card-title">Critical Gaps</div><div class="card-sub">Team average below 2.5</div><div style="display:flex;flex-wrap:wrap;gap:6px">${criticalGaps.map(s=>`<span style="display:inline-flex;align-items:center;gap:4px;background:#fde8e8;color:var(--red);padding:4px 10px;border-radius:16px;font-size:.75rem;font-weight:600">${s} <span style="background:var(--red);color:#fff;padding:1px 5px;border-radius:6px;font-size:.65rem">${skillAvgs[s]}</span></span>`).join('')}</div></div>`:''}<div class="card mb-6"><div class="card-title">Staff x Skills</div><div class="matrix-wrap" style="max-height:640px;overflow:auto;margin-top:14px"><table class="matrix-table"><thead><tr><th class="col-name">Name</th><th class="col-role">Role</th><th class="col-team">Team</th>${allSkills.map(s=>`<th class="col-skill">${s}</th>`).join('')}</tr></thead><tbody>${teams.map(team=>`<tr class="team-header-row"><td colspan="${3+allSkills.length}">${team} (${byTeam[team].length})</td></tr>${byTeam[team].map(u=>`<tr><td style="white-space:nowrap"><div style="display:flex;align-items:center;gap:8px"><div style="width:26px;height:26px;border-radius:50%;background:var(--moss);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;flex-shrink:0">${ini(u.name)}</div><div>${u.name}</div></div></td><td><span class="badge badge-navy">${u.role}</span></td><td>${u.team||'—'}</td>${allSkills.map(s=>{const v=(u.skills||{})[s];return`<td><div class="mc mc-${v||0}">${v||'—'}</div></td>`;}).join('')}</tr>`).join('')}`).join('')}<tr style="background:var(--sand-pale);border-top:2px solid var(--border)"><td colspan="3" style="font-weight:700;font-size:.75rem;color:var(--muted)">AVERAGE</td>${allSkills.map(s=>{const avg=skillAvgs[s];const cl=avg?(parseFloat(avg)<2?'mc-1':parseFloat(avg)<3?'mc-2':parseFloat(avg)<4?'mc-3':parseFloat(avg)<5?'mc-4':'mc-5'):'mc-0';return`<td><div class="mc ${cl}" style="font-size:.68rem">${avg||'—'}</div></td>`;}).join('')}</tr></tbody></table></div></div>`;}
+
+// ══════════════════════════════════════════════════════════
+// MY TEAM
+// ══════════════════════════════════════════════════════════
+function renderMyTeam(){
+  const u=S.currentUser;if(!u)return;
+  const team=S.users.filter(m=>m.manager===u.id);
+  if(!team.length){document.getElementById('view-myteam').innerHTML='<div class="empty-state"><p>No one is currently reporting to you.</p></div>';return;}
+
+  // Stats
+  const totalSkillRatings=team.flatMap(m=>Object.values(m.skills||{}));
+  const avgSkill=totalSkillRatings.length?(totalSkillRatings.reduce((a,b)=>a+b,0)/totalSkillRatings.length).toFixed(1):'—';
+  const myAssignments=S.assignments.filter(a=>team.some(m=>m.id===a.userId));
+  const completedA=myAssignments.filter(a=>a.status==='completed').length;
+  const trainingPct=myAssignments.length?Math.round(completedA/myAssignments.length*100):0;
+  const activeGoals=team.flatMap(m=>(m.goals||[]).filter(g=>g.status==='in-progress')).length;
+  const currentYear=new Date().getFullYear();
+  const teamCpd=S.cpdLog.filter(e=>team.some(m=>m.id===e.userId)&&e.year===currentYear);
+  const totalCpdHrs=teamCpd.reduce((a,e)=>a+(parseFloat(e.hours)||0),0).toFixed(1);
+
+  // Collect all skills across team
+  const allSkills=[...new Set(team.flatMap(m=>Object.keys(m.skills||{})))].sort();
+
+  document.getElementById('view-myteam').innerHTML=`
+    <div class="page-title">My Team</div>
+    <div class="page-sub">Reporting to ${u.name} · ${team.length} direct report${team.length!==1?'s':''}</div>
+
+    <div class="stat-grid">
+      <div class="stat-card accent"><div class="s-label">Team Size</div><div class="s-value">${team.length}</div><div class="s-note">Direct reports</div></div>
+      <div class="stat-card accent2"><div class="s-label">Avg Skill Rating</div><div class="s-value">${avgSkill}</div><div class="s-note">Out of 5 across all skills</div></div>
+      <div class="stat-card accent3"><div class="s-label">Training Complete</div><div class="s-value">${myAssignments.length?trainingPct+'%':'—'}</div><div class="s-note">${completedA} of ${myAssignments.length} assignments</div></div>
+      <div class="stat-card accent4"><div class="s-label">Active Goals</div><div class="s-value">${activeGoals}</div><div class="s-note">In progress across team</div></div>
+      <div class="stat-card accent6"><div class="s-label">CPD Hours ${currentYear}</div><div class="s-value">${totalCpdHrs}</div><div class="s-note">Team total this year</div></div>
+    </div>
+
+    <div style="margin-bottom:24px">
+      <div class="section-header"><h3 style="font-size:.95rem;font-weight:700">Team Members</h3></div>
+      <div class="two-col">
+        ${team.map(m=>{
+          const mAssign=S.assignments.filter(a=>a.userId===m.id);
+          const mDone=mAssign.filter(a=>a.status==='completed').length;
+          const mPending=mAssign.filter(a=>a.status==='pending');
+          const lastRev=S.reviews.filter(r=>r.userId===m.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
+          const skillCount=Object.keys(m.skills||{}).length;
+          const avgM=skillCount?((Object.values(m.skills).reduce((a,b)=>a+b,0))/skillCount).toFixed(1):'—';
+          const mCpd=S.cpdLog.filter(e=>e.userId===m.id&&e.year===currentYear).reduce((a,e)=>a+(parseFloat(e.hours)||0),0).toFixed(1);
+          const overdue=mPending.filter(a=>a.dueDate&&a.dueDate<new Date().toISOString().slice(0,10));
+          return`<div class="card">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+              <div class="avatar" style="width:40px;height:40px;font-size:.82rem;flex-shrink:0">${m.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:.9rem">${m.name}</div>
+                <div style="font-size:.72rem;color:var(--muted)">${m.role}${m.team?` · ${m.team}`:''}</div>
+              </div>
+              ${overdue.length?`<span class="badge badge-red">⚠ ${overdue.length} overdue</span>`:''}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.75rem;margin-bottom:12px">
+              <div><span style="color:var(--muted)">Avg skill</span> <strong>${avgM}/5</strong></div>
+              <div><span style="color:var(--muted)">Skills rated</span> <strong>${skillCount}</strong></div>
+              <div><span style="color:var(--muted)">Training</span> <strong>${mDone}/${mAssign.length} done</strong></div>
+              <div><span style="color:var(--muted)">CPD ${currentYear}</span> <strong>${mCpd} hrs</strong></div>
+            </div>
+            ${mAssign.length?`<div class="progress-wrap" style="margin-bottom:10px"><div class="progress-fill pf-4" style="width:${mAssign.length?Math.round(mDone/mAssign.length*100):0}%"></div></div>`:''}
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:.7rem;color:var(--muted)">Last review: ${lastRev?lastRev.date:'None'}</div>
+              ${S.adminUnlocked?`<button class="btn btn-secondary btn-sm" onclick="switchToUser('${m.id}')">View Profile</button>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="section-header"><h3 style="font-size:.95rem;font-weight:700">Skills Overview</h3></div>
+      <div style="overflow-x:auto">
+        <table class="matrix-table">
+          <thead><tr>
+            <th class="col-name">Name</th>
+            ${allSkills.slice(0,10).map(s=>`<th style="min-width:90px;font-size:.62rem;text-align:center;white-space:normal;line-height:1.2;padding:6px 4px">${s}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${team.map(m=>`<tr>
+              <td class="col-name"><strong>${m.name.split(' ')[0]}</strong></td>
+              ${allSkills.slice(0,10).map(s=>{const v=(m.skills||{})[s]||0;const cls=v>=4?'badge-green':v>=3?'badge-teal':v>=2?'badge-amber':v?'badge-red':'badge-grey';return`<td style="text-align:center"><span class="badge ${cls}" style="min-width:20px">${v||'—'}</span></td>`;}).join('')}
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${allSkills.length>10?`<div style="font-size:.72rem;color:var(--muted);margin-top:8px">Showing top 10 skills. Full matrix available in Admin → Matrix.</div>`:''}
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-header"><h3 style="font-size:.95rem;font-weight:700">Active Goals</h3></div>
+        ${team.flatMap(m=>(m.goals||[]).filter(g=>g.status==='in-progress').map(g=>({...g,_member:m}))).length===0
+          ?'<div class="empty-state" style="padding:20px 0"><p>No active goals</p></div>'
+          :team.flatMap(m=>(m.goals||[]).filter(g=>g.status==='in-progress').map(g=>`
+            <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+              <div style="font-size:.8rem;font-weight:600">${g.title}</div>
+              <div style="font-size:.7rem;color:var(--muted)">${m.name} · ${g.category} · ${g.timeframe==='short'?'0–6 mo':g.timeframe==='medium'?'6–18 mo':'18 mo+'}</div>
+            </div>`)).join('')
+        }
+      </div>
+      <div class="card">
+        <div class="section-header"><h3 style="font-size:.95rem;font-weight:700">Training Assignments</h3></div>
+        ${S.assignments.filter(a=>team.some(m=>m.id===a.userId)&&a.status==='pending').length===0
+          ?'<div class="empty-state" style="padding:20px 0"><p>No pending assignments</p></div>'
+          :S.assignments.filter(a=>team.some(m=>m.id===a.userId)&&a.status==='pending').slice(0,8).map(a=>{
+            const mat=S.materials.find(m=>m.id===a.matId);
+            const usr=team.find(m=>m.id===a.userId);
+            const overdue=a.dueDate&&a.dueDate<new Date().toISOString().slice(0,10);
+            return`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div>
+                  <div style="font-size:.8rem;font-weight:600">${mat?.title||'Deleted'}</div>
+                  <div style="font-size:.7rem;color:var(--muted)">${usr?.name||'?'}${a.dueDate?' · Due '+a.dueDate:''}</div>
+                </div>
+                ${overdue?'<span class="badge badge-red">Overdue</span>':'<span class="badge badge-amber">Pending</span>'}
+              </div>
+            </div>`;
+          }).join('')
+        }
+      </div>
+    </div>
+  `;
+}
 
 // ══════════════════════════════════════════════════════════
 // ADMIN
