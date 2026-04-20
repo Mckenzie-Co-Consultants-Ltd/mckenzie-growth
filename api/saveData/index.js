@@ -8,7 +8,7 @@ module.exports = async function (context, req) {
       return;
     }
 
-    const collections = ['users', 'materials', 'assignments', 'reviews', 'onetoones'];
+    const collections = ['users', 'materials', 'assignments', 'reviews', 'onetoones', 'cpdLog'];
 
     for (const name of collections) {
       if (data[name] !== undefined) {

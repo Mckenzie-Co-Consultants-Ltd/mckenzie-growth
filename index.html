@@ -638,6 +638,7 @@ Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen
       <input type="file" id="mat-file" style="display:none" accept=".pdf,.docx,.pptx,.xlsx,.mp4,.png,.jpg,.jpeg" onchange="handleFileSelect(event)"/>
     </div>
     <div class="form-group"><label class="form-label">Estimated Duration</label><input class="form-input" id="mat-duration" placeholder="e.g. 2 hrs, 30 mins"/></div>
+    <div class="form-group"><label class="form-label">CPD Hours</label><input class="form-input" id="mat-cpdhours" type="number" step="0.5" min="0" placeholder="e.g. 2"/></div>
     <div class="form-group">
       <label class="form-label">Discipline Tags</label>
       <div id="mat-disc-tags" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -710,6 +711,26 @@ Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen
       <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-view-mat')">Close</button>
     </div>
     <div id="vm-body"></div>
+  </div>
+</div>
+
+<!-- Modal: Manual CPD Entry -->
+<div class="modal-overlay" id="modal-cpd">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">Log CPD Hours</div>
+    <div class="modal-sub">Record CPD from external courses, conferences, or self-study</div>
+    <div class="form-group"><label class="form-label">Activity Title *</label><input class="form-input" id="cpd-title" placeholder="e.g. Engineers Australia Conference 2026"/></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">CPD Hours *</label><input class="form-input" id="cpd-hours" type="number" step="0.5" min="0.5" placeholder="e.g. 8"/></div>
+      <div class="form-group"><label class="form-label">Date</label><input class="form-input" id="cpd-date" type="date"/></div>
+    </div>
+    <div class="form-group"><label class="form-label">Skill / Topic Area</label><input class="form-input" id="cpd-skill" placeholder="e.g. Project Management"/></div>
+    <div class="form-group"><label class="form-label">Provider / Notes</label><input class="form-input" id="cpd-provider" placeholder="e.g. Engineers Australia"/></div>
+    <input type="hidden" id="cpd-edit-id"/>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-cpd')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCpdEntry()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -839,7 +860,7 @@ const IDEAL_TEAM={engineering:{'Principal Engineer':1,'Senior Engineer':2,'Engin
 // ══════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════
-let S={currentUser:null,users:[],materials:[],assignments:[],reviews:[],onetoones:[],skillsCatalog:null,view:'dashboard',adminUnlocked:false};
+let S={currentUser:null,users:[],materials:[],assignments:[],reviews:[],onetoones:[],skillsCatalog:null,cpdLog:[],view:'dashboard',adminUnlocked:false};
 let pendingFileData=null;
 
 // ══════════════════════════════════════════════════════════
@@ -856,12 +877,13 @@ function save(){
   localStorage.setItem('mck_reviews',JSON.stringify(S.reviews));
   localStorage.setItem('mck_onetoones',JSON.stringify(S.onetoones));
   localStorage.setItem('mck_skills',JSON.stringify(S.skillsCatalog));
+  localStorage.setItem('mck_cpdlog', JSON.stringify(S.cpdLog));
   // Debounce API saves (300ms) so rapid changes don't flood the server
   if(_useAPI){
     clearTimeout(_saveTimer);
     _saveTimer=setTimeout(()=>{
       fetch('/api/saveData',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({users:S.users,materials:S.materials,assignments:S.assignments,reviews:S.reviews,onetoones:S.onetoones,skillsCatalog:S.skillsCatalog})
+        body:JSON.stringify({users:S.users,materials:S.materials,assignments:S.assignments,reviews:S.reviews,onetoones:S.onetoones,skillsCatalog:S.skillsCatalog,cpdLog:S.cpdLog})
       }).catch(err=>console.warn('API save failed, data safe in localStorage:',err));
     },300);
   }
@@ -876,6 +898,7 @@ async function load(){
       S.assignments=data.assignments||[];S.reviews=data.reviews||[];
       S.onetoones=data.onetoones||[];
       S.skillsCatalog=data.skillsCatalog||null;
+      S.cpdLog = data.cpdLog || [];
       _useAPI=true;
     }else throw new Error('API returned '+res.status);
   }catch(e){
@@ -886,6 +909,7 @@ async function load(){
     try{S.reviews=JSON.parse(localStorage.getItem('mck_reviews')||'[]');}catch(e){S.reviews=[];}
     try{S.onetoones=JSON.parse(localStorage.getItem('mck_onetoones')||'[]');}catch(e){S.onetoones=[];}
     try{S.skillsCatalog=JSON.parse(localStorage.getItem('mck_skills')||'null');}catch(e){S.skillsCatalog=null;}
+    try{S.cpdLog=JSON.parse(localStorage.getItem('mck_cpdlog')||'[]');}catch(e){S.cpdLog=[];}
   }
   // Only seed demo data in local dev mode (not on live Azure site)
   if(!S.users.length && !_useAPI) seedDemo();
@@ -1214,9 +1238,163 @@ function togglePlanSkill(header){const body=header.nextElementSibling;body.class
 // ══════════════════════════════════════════════════════════
 // MY COURSES
 // ══════════════════════════════════════════════════════════
-function renderMyCourses(){const u=S.currentUser;if(!u)return;const assignments=myAssignments();const pending=assignments.filter(a=>a.status==='pending');const done=assignments.filter(a=>a.status==='completed');const assignHtml=list=>list.map(a=>{const mat=S.materials.find(m=>m.id===a.matId)||{title:'Unknown',type:'Guide'};return`<div class="assigned-banner" style="${a.status==='completed'?'opacity:.7':''}"><div class="ab-icon">${TYPE_ICONS[mat.type]||'📚'}</div><div class="ab-body"><div class="ab-title">${mat.title}</div><div class="ab-meta">Assigned by ${a.assignedBy} on ${fmtDate(a.assignedAt)}${a.dueDate?' · Due '+fmtDate(a.dueDate):''}</div>${a.message?`<div class="ab-meta" style="margin-top:4px;font-style:italic">"${esc(a.message)}"</div>`:''}</div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><span class="ab-badge" style="background:${a.status==='completed'?'var(--moss)':'var(--amber)'}">${a.status==='completed'?'Completed':'Pending'}</span><div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" onclick="viewMaterial('${mat.id}')">Open</button>${a.status==='pending'?`<button class="btn btn-success btn-sm" onclick="markDone('${a.id}')">Done</button>`:''}</div></div></div>`;}).join('')||'<p class="text-sm text-muted">None.</p>';
-  document.getElementById('view-mycourses').innerHTML=`<div class="page-title">My Courses</div><div class="page-sub">Training materials assigned to you</div><div class="stat-grid"><div class="stat-card accent3"><div class="s-label">Pending</div><div class="s-value">${pending.length}</div></div><div class="stat-card accent2"><div class="s-label">Completed</div><div class="s-value">${done.length}</div></div></div>${pending.length?`<h3 style="font-size:.86rem;font-weight:700;color:var(--amber);margin-bottom:12px">Pending (${pending.length})</h3>${assignHtml(pending)}`:''}${done.length?`<h3 style="font-size:.86rem;font-weight:700;color:var(--green);margin-bottom:12px;margin-top:20px">Completed (${done.length})</h3>${assignHtml(done)}`:''}${!assignments.length?`<div class="empty-state"><div class="empty-icon">🎓</div><p>No courses assigned yet.</p></div>`:''}`;}
-function markDone(id){const a=S.assignments.find(x=>x.id===id);if(a){a.status='completed';save();updateAssignedBadge();renderMyCourses();}}
+function renderMyCourses(){
+  const u=S.currentUser;if(!u)return;
+  const assignments=myAssignments();
+  const pending=assignments.filter(a=>a.status==='pending');
+  const done=assignments.filter(a=>a.status==='completed');
+  // CPD data
+  const myLog=S.cpdLog.filter(e=>e.userId===u.id);
+  const years=[...new Set(myLog.map(e=>e.year))].sort((a,b)=>b-a);
+  const currentYear=new Date().getFullYear();
+  if(!years.includes(currentYear))years.unshift(currentYear);
+  const selYear=window._cpdYear||currentYear;
+  window._cpdYear=selYear;
+  const yearLog=myLog.filter(e=>e.year===selYear).sort((a,b)=>b.date.localeCompare(a.date));
+  const totalCpd=yearLog.reduce((s,e)=>s+e.cpdHours,0);
+  // By skill breakdown
+  const bySkill={};yearLog.forEach(e=>{bySkill[e.skill]=(bySkill[e.skill]||0)+e.cpdHours;});
+
+  const assignHtml=list=>list.map(a=>{
+    const mat=S.materials.find(m=>m.id===a.matId)||{title:'Unknown',type:'Guide'};
+    return`<div class="assigned-banner" style="${a.status==='completed'?'opacity:.7':''}">
+      <div class="ab-icon">${TYPE_ICONS[mat.type]||'📚'}</div>
+      <div class="ab-body">
+        <div class="ab-title">${mat.title}</div>
+        <div class="ab-meta">Assigned by ${a.assignedBy} on ${fmtDate(a.assignedAt)}${a.dueDate?' · Due '+fmtDate(a.dueDate):''}</div>
+        ${mat.cpdHours?`<div class="ab-meta"><span class="badge badge-teal">${mat.cpdHours} CPD hrs</span></div>`:''}
+        ${a.message?`<div class="ab-meta" style="margin-top:4px;font-style:italic">"${esc(a.message)}"</div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <span class="ab-badge" style="background:${a.status==='completed'?'var(--moss)':'var(--amber)'}">${a.status==='completed'?'Completed':'Pending'}</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-primary btn-sm" onclick="viewMaterial('${mat.id}')">Open</button>
+          ${a.status==='pending'?`<button class="btn btn-success btn-sm" onclick="markDone('${a.id}')">✓ Done</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('')||'<p class="text-sm text-muted">None.</p>';
+
+  const cpdRowHtml=yearLog.map(e=>`
+    <tr>
+      <td>${fmtDate(e.date)}</td>
+      <td><strong>${esc(e.title)}</strong>${e.provider?`<div class="text-xs text-muted">${esc(e.provider)}</div>`:''}</td>
+      <td>${esc(e.skill||'—')}</td>
+      <td><span class="badge badge-teal">${e.cpdHours} hrs</span></td>
+      <td><span class="badge ${e.source==='material'?'badge-green':'badge-navy'}">${e.source==='material'?'Course':'Manual'}</span></td>
+      <td style="white-space:nowrap">
+        ${e.source==='manual'?`<button class="btn btn-secondary btn-sm" onclick="openCpdModal('${e.id}')">Edit</button> `:''}
+        <button class="btn btn-danger btn-sm" onclick="deleteCpdEntry('${e.id}')">✕</button>
+      </td>
+    </tr>`).join('');
+
+  document.getElementById('view-mycourses').innerHTML=`
+    <div class="page-title">My Courses</div>
+    <div class="page-sub">Training materials assigned to you</div>
+    <div class="stat-grid">
+      <div class="stat-card accent3"><div class="s-label">Pending</div><div class="s-value">${pending.length}</div></div>
+      <div class="stat-card accent2"><div class="s-label">Completed</div><div class="s-value">${done.length}</div></div>
+      <div class="stat-card accent"><div class="s-label">CPD Hours ${selYear}</div><div class="s-value">${totalCpd}</div></div>
+    </div>
+
+    ${pending.length?`<h3 style="font-size:.86rem;font-weight:700;color:var(--amber);margin-bottom:12px">Pending (${pending.length})</h3>${assignHtml(pending)}`:''}
+    ${done.length?`<h3 style="font-size:.86rem;font-weight:700;color:var(--green);margin-bottom:12px;margin-top:20px">Completed (${done.length})</h3>${assignHtml(done)}`:''}
+    ${!assignments.length?`<div class="empty-state"><div class="empty-icon">🎓</div><p>No courses assigned yet.</p></div>`:''}
+
+    <div class="card" style="margin-top:32px">
+      <div class="section-header">
+        <h3>CPD Log</h3>
+        <div class="ml-auto" style="display:flex;gap:8px;align-items:center">
+          <select class="form-select" style="width:auto" onchange="window._cpdYear=parseInt(this.value);renderMyCourses()">
+            ${years.map(y=>`<option value="${y}" ${y===selYear?'selected':''}>${y}</option>`).join('')}
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="openCpdModal()">+ Log CPD</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportCpdReport(${selYear})">⬇ Export ${selYear}</button>
+        </div>
+      </div>
+      ${Object.keys(bySkill).length?`
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0">
+          ${Object.entries(bySkill).sort((a,b)=>b[1]-a[1]).map(([s,h])=>`<span style="background:var(--water-pale);color:#3a6a70;padding:4px 10px;border-radius:12px;font-size:.75rem;font-weight:600">${s}: ${h} hrs</span>`).join('')}
+        </div>`:''}
+      ${yearLog.length?`
+        <div style="overflow:auto">
+          <table>
+            <thead><tr><th>Date</th><th>Activity</th><th>Topic</th><th>Hours</th><th>Source</th><th></th></tr></thead>
+            <tbody>${cpdRowHtml}</tbody>
+            <tfoot><tr style="font-weight:700;background:var(--sand-pale)"><td colspan="3">Total ${selYear}</td><td><span class="badge badge-green">${totalCpd} hrs</span></td><td colspan="2"></td></tr></tfoot>
+          </table>
+        </div>`:`<div class="empty-state" style="padding:20px"><p>No CPD logged for ${selYear}. <a href="#" onclick="openCpdModal();return false" style="color:var(--moss)">Log your first entry.</a></p></div>`}
+    </div>`;
+}
+function markDone(id){
+  const a=S.assignments.find(x=>x.id===id);
+  if(!a)return;
+  a.status='completed';
+  a.completedAt=new Date().toISOString().split('T')[0];
+  // Log CPD hours if the material has any
+  const mat=S.materials.find(m=>m.id===a.matId);
+  if(mat&&mat.cpdHours>0&&S.currentUser){
+    S.cpdLog.push({
+      id:'cpd'+Date.now(),
+      userId:S.currentUser.id,
+      title:mat.title,
+      skill:mat.skill||'General',
+      cpdHours:mat.cpdHours,
+      date:a.completedAt,
+      source:'material',
+      refId:a.id,
+      year:new Date().getFullYear()
+    });
+  }
+  save();updateAssignedBadge();renderMyCourses();
+}
+
+function openCpdModal(editId){
+  document.getElementById('cpd-edit-id').value=editId||'';
+  if(editId){
+    const e=S.cpdLog.find(x=>x.id===editId);
+    if(!e)return;
+    document.getElementById('cpd-title').value=e.title||'';
+    document.getElementById('cpd-hours').value=e.cpdHours||'';
+    document.getElementById('cpd-date').value=e.date||'';
+    document.getElementById('cpd-skill').value=e.skill||'';
+    document.getElementById('cpd-provider').value=e.provider||'';
+  }else{
+    ['cpd-title','cpd-hours','cpd-skill','cpd-provider'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('cpd-date').value=new Date().toISOString().split('T')[0];
+  }
+  document.getElementById('modal-cpd').classList.add('open');
+}
+function saveCpdEntry(){
+  const title=document.getElementById('cpd-title').value.trim();
+  const hours=parseFloat(document.getElementById('cpd-hours').value);
+  if(!title||!hours){alert('Title and CPD hours are required.');return;}
+  const editId=document.getElementById('cpd-edit-id').value;
+  const date=document.getElementById('cpd-date').value||new Date().toISOString().split('T')[0];
+  const entry={
+    id:editId||'cpd'+Date.now(),
+    userId:S.currentUser.id,
+    title,cpdHours:hours,date,
+    skill:document.getElementById('cpd-skill').value.trim()||'General',
+    provider:document.getElementById('cpd-provider').value.trim(),
+    source:'manual',
+    year:parseInt(date.split('-')[0])
+  };
+  if(editId){const i=S.cpdLog.findIndex(x=>x.id===editId);if(i>=0)S.cpdLog[i]=entry;}
+  else S.cpdLog.push(entry);
+  save();closeModal('modal-cpd');renderMyCourses();
+}
+function deleteCpdEntry(id){if(!confirm('Delete this CPD entry?'))return;S.cpdLog=S.cpdLog.filter(x=>x.id!==id);save();renderMyCourses();}
+function exportCpdReport(year){
+  const u=S.currentUser;if(!u)return;
+  const entries=S.cpdLog.filter(e=>e.userId===u.id&&e.year===year).sort((a,b)=>a.date.localeCompare(b.date));
+  const totalHours=entries.reduce((s,e)=>s+e.cpdHours,0);
+  const rows=['Date,Activity,Skill / Topic,Provider,CPD Hours,Source'];
+  entries.forEach(e=>rows.push(`"${e.date}","${e.title}","${e.skill||''}","${e.provider||''}",${e.cpdHours},"${e.source==='material'?'Company Course':'Manual Entry'}"`));
+  rows.push(`,,,,${totalHours},TOTAL`);
+  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${u.name.replace(/\s+/g,'-')}-CPD-Report-${year}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
 
 // ══════════════════════════════════════════════════════════
 // PERFORMANCE REVIEWS
@@ -1256,12 +1434,12 @@ function renderMaterials(){
   let filtered=filterSkill==='all'?S.materials:S.materials.filter(m=>m.skill===filterSkill);
   if(filterDisc!=='all')filtered=filtered.filter(m=>(m.discTags||[]).includes(filterDisc)||(m.discTags||[]).includes('all-disciplines'));
   if(filterSen!=='all')filtered=filtered.filter(m=>(m.senTags||[]).includes(filterSen)||(m.senTags||[]).includes('all-levels'));
-  document.getElementById('view-materials').innerHTML=`<div class="page-title">Training Materials</div><div class="page-sub">Admin view</div><div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center"><button class="btn btn-primary" onclick="openUploadModal()">+ Upload</button><select class="form-select" style="width:auto;min-width:180px" onchange="window._matFilter=this.value;renderMaterials()">${skills.map(s=>`<option value="${s}" ${s===filterSkill?'selected':''}>${s==='all'?'All skills':s}</option>`).join('')}</select><select class="form-select" style="width:auto;min-width:170px" onchange="window._matDiscFilter=this.value;renderMaterials()"><option value="all" ${filterDisc==='all'?'selected':''}>All disciplines</option>${Object.entries(DISC_TAG_LABELS).map(([v,l])=>`<option value="${v}" ${v===filterDisc?'selected':''}>${l}</option>`).join('')}</select><select class="form-select" style="width:auto;min-width:170px" onchange="window._matSenFilter=this.value;renderMaterials()"><option value="all" ${filterSen==='all'?'selected':''}>All seniority</option>${Object.entries(SEN_TAG_LABELS).map(([v,l])=>`<option value="${v}" ${v===filterSen?'selected':''}>${l}</option>`).join('')}</select><span class="text-muted text-sm">${filtered.length} items</span></div>${filtered.map(m=>`<div class="material-card"><div class="material-icon" style="color:${MAT_COLORS[m.type]||'var(--muted)'}">${TYPE_ICONS[m.type]||'📄'}</div><div class="material-body"><div class="material-title">${m.title}</div><div class="material-meta"><span class="badge badge-grey">${m.type}</span><span class="badge badge-green">${m.skill}</span>${m.duration?`<span class="text-xs text-muted">${m.duration}</span>`:''}</div>${(m.discTags&&m.discTags.length)||(m.senTags&&m.senTags.length)?`<div class="material-meta" style="margin-top:6px">${(m.discTags||[]).map(t=>`<span class="badge badge-moss">${DISC_TAG_LABELS[t]||t}</span>`).join('')}${(m.senTags||[]).map(t=>`<span class="badge badge-water">${SEN_TAG_LABELS[t]||t}</span>`).join('')}</div>`:''}${m.desc?`<div class="material-desc">${esc(m.desc)}</div>`:''}</div><div class="material-actions"><button class="btn btn-primary btn-sm" onclick="viewMaterial('${m.id}')">View</button><button class="btn btn-secondary btn-sm" onclick="editMaterial('${m.id}')">Edit</button><button class="btn btn-secondary btn-sm" onclick="openPushModal('${m.id}')">Push</button><button class="btn btn-danger btn-sm" onclick="deleteMaterial('${m.id}')">✕</button></div></div>`).join('')||'<div class="empty-state"><p>No materials match the current filters.</p></div>'}`;
+  document.getElementById('view-materials').innerHTML=`<div class="page-title">Training Materials</div><div class="page-sub">Admin view</div><div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center"><button class="btn btn-primary" onclick="openUploadModal()">+ Upload</button><select class="form-select" style="width:auto;min-width:180px" onchange="window._matFilter=this.value;renderMaterials()">${skills.map(s=>`<option value="${s}" ${s===filterSkill?'selected':''}>${s==='all'?'All skills':s}</option>`).join('')}</select><select class="form-select" style="width:auto;min-width:170px" onchange="window._matDiscFilter=this.value;renderMaterials()"><option value="all" ${filterDisc==='all'?'selected':''}>All disciplines</option>${Object.entries(DISC_TAG_LABELS).map(([v,l])=>`<option value="${v}" ${v===filterDisc?'selected':''}>${l}</option>`).join('')}</select><select class="form-select" style="width:auto;min-width:170px" onchange="window._matSenFilter=this.value;renderMaterials()"><option value="all" ${filterSen==='all'?'selected':''}>All seniority</option>${Object.entries(SEN_TAG_LABELS).map(([v,l])=>`<option value="${v}" ${v===filterSen?'selected':''}>${l}</option>`).join('')}</select><span class="text-muted text-sm">${filtered.length} items</span></div>${filtered.map(m=>`<div class="material-card"><div class="material-icon" style="color:${MAT_COLORS[m.type]||'var(--muted)'}">${TYPE_ICONS[m.type]||'📄'}</div><div class="material-body"><div class="material-title">${m.title}</div><div class="material-meta"><span class="badge badge-grey">${m.type}</span><span class="badge badge-green">${m.skill}</span>${m.duration?`<span class="text-xs text-muted">${m.duration}</span>`:''}${m.cpdHours?`<span class="badge badge-teal">${m.cpdHours} CPD hrs</span>`:''}</div>${(m.discTags&&m.discTags.length)||(m.senTags&&m.senTags.length)?`<div class="material-meta" style="margin-top:6px">${(m.discTags||[]).map(t=>`<span class="badge badge-moss">${DISC_TAG_LABELS[t]||t}</span>`).join('')}${(m.senTags||[]).map(t=>`<span class="badge badge-water">${SEN_TAG_LABELS[t]||t}</span>`).join('')}</div>`:''}${m.desc?`<div class="material-desc">${esc(m.desc)}</div>`:''}</div><div class="material-actions"><button class="btn btn-primary btn-sm" onclick="viewMaterial('${m.id}')">View</button><button class="btn btn-secondary btn-sm" onclick="editMaterial('${m.id}')">Edit</button><button class="btn btn-secondary btn-sm" onclick="openPushModal('${m.id}')">Push</button><button class="btn btn-danger btn-sm" onclick="deleteMaterial('${m.id}')">✕</button></div></div>`).join('')||'<div class="empty-state"><p>No materials match the current filters.</p></div>'}`;
 }
 function setMatTagState(containerId,values){document.querySelectorAll('#'+containerId+' input[type=checkbox]').forEach(cb=>{cb.checked=(values||[]).includes(cb.value);});}
 function getMatTagState(containerId){return [...document.querySelectorAll('#'+containerId+' input[type=checkbox]:checked')].map(cb=>cb.value);}
-function openUploadModal(){['mat-title','mat-desc','mat-url','mat-duration','mat-edit-id'].forEach(i=>document.getElementById(i).value='');document.getElementById('mat-type').value='PDF';document.getElementById('mat-skill').value='General';setMatTagState('mat-disc-tags',[]);setMatTagState('mat-sen-tags',[]);document.getElementById('upload-zone-text').textContent='Click to choose file or drag and drop';document.querySelector('#modal-upload .modal-title').textContent='Upload Training Material';document.getElementById('mat-save-btn').textContent='Add to Library';pendingFileData=null;document.getElementById('modal-upload').classList.add('open');}
-function editMaterial(id){const m=S.materials.find(x=>x.id===id);if(!m)return;document.getElementById('mat-edit-id').value=id;document.getElementById('mat-title').value=m.title||'';document.getElementById('mat-desc').value=m.desc||'';document.getElementById('mat-type').value=m.type||'PDF';document.getElementById('mat-skill').value=m.skill||'General';document.getElementById('mat-url').value=m.url||'';document.getElementById('mat-duration').value=m.duration||'';setMatTagState('mat-disc-tags',m.discTags||[]);setMatTagState('mat-sen-tags',m.senTags||[]);document.getElementById('upload-zone-text').textContent=m.fileName?`${m.fileName}${m.size?' ('+m.size+')':''} — upload a new file to replace`:'Click to choose file or drag and drop';document.querySelector('#modal-upload .modal-title').textContent='Edit Training Material';document.getElementById('mat-save-btn').textContent='Save Changes';pendingFileData=null;document.getElementById('modal-upload').classList.add('open');}
+function openUploadModal(){['mat-title','mat-desc','mat-url','mat-duration','mat-edit-id'].forEach(i=>document.getElementById(i).value='');document.getElementById('mat-cpdhours').value='';document.getElementById('mat-type').value='PDF';document.getElementById('mat-skill').value='General';setMatTagState('mat-disc-tags',[]);setMatTagState('mat-sen-tags',[]);document.getElementById('upload-zone-text').textContent='Click to choose file or drag and drop';document.querySelector('#modal-upload .modal-title').textContent='Upload Training Material';document.getElementById('mat-save-btn').textContent='Add to Library';pendingFileData=null;document.getElementById('modal-upload').classList.add('open');}
+function editMaterial(id){const m=S.materials.find(x=>x.id===id);if(!m)return;document.getElementById('mat-edit-id').value=id;document.getElementById('mat-title').value=m.title||'';document.getElementById('mat-desc').value=m.desc||'';document.getElementById('mat-type').value=m.type||'PDF';document.getElementById('mat-skill').value=m.skill||'General';document.getElementById('mat-url').value=m.url||'';document.getElementById('mat-duration').value=m.duration||'';document.getElementById('mat-cpdhours').value=m.cpdHours||'';setMatTagState('mat-disc-tags',m.discTags||[]);setMatTagState('mat-sen-tags',m.senTags||[]);document.getElementById('upload-zone-text').textContent=m.fileName?`${m.fileName}${m.size?' ('+m.size+')':''} — upload a new file to replace`:'Click to choose file or drag and drop';document.querySelector('#modal-upload .modal-title').textContent='Edit Training Material';document.getElementById('mat-save-btn').textContent='Save Changes';pendingFileData=null;document.getElementById('modal-upload').classList.add('open');}
 function handleFileSelect(e){const file=e.target.files[0];if(!file)return;readFile(file);}
 function handleDragOver(e){e.preventDefault();document.getElementById('upload-zone').classList.add('drag');}
 function handleDrop(e){e.preventDefault();document.getElementById('upload-zone').classList.remove('drag');const file=e.dataTransfer.files[0];if(!file)return;readFile(file);}
@@ -1277,6 +1455,7 @@ function saveMaterial(){
     skill:document.getElementById('mat-skill').value,
     url:document.getElementById('mat-url').value.trim(),
     duration:document.getElementById('mat-duration').value.trim(),
+    cpdHours: parseFloat(document.getElementById('mat-cpdhours').value)||0,
     discTags:getMatTagState('mat-disc-tags'),
     senTags:getMatTagState('mat-sen-tags'),
   };
