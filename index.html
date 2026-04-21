@@ -123,6 +123,7 @@ body{font-family:'Inter',Arial,Helvetica,sans-serif;background:var(--bg);color:v
 .rating-btn.sel-3{background:#c4a820;border-color:#c4a820;color:#fff}
 .rating-btn.sel-4{background:var(--moss);border-color:var(--moss);color:#fff}
 .rating-btn.sel-5{background:var(--moss-dark);border-color:var(--moss-dark);color:#fff}
+.rating-btn.sel-pending{background:var(--amber);color:#fff;border-color:var(--amber)}
 
 /* Tables */
 table{width:100%;border-collapse:collapse;font-size:.82rem}
@@ -359,6 +360,7 @@ tr:last-child td{border-bottom:none}
   <div class="nav-item active" data-view="dashboard" onclick="navigate('dashboard',this)"><span class="icon">📊</span> Dashboard</div>
   <div class="nav-item" data-view="goals" onclick="navigate('goals',this)"><span class="icon">🎯</span> My Goals</div>
   <div class="nav-item" data-view="skills" onclick="navigate('skills',this)"><span class="icon">⚡</span> Skills Assessment</div>
+  <div class="nav-item" data-view="mycareer" onclick="navigate('mycareer',this)"><span class="icon">🚀</span> My Career</div>
   <div class="nav-item" data-view="training" onclick="navigate('training',this)"><span class="icon">📚</span> Training Plan</div>
   <div class="nav-item" data-view="mycourses" onclick="navigate('mycourses',this)"><span class="icon">🎓</span> My Courses <span class="nav-badge" id="nb-assigned" style="display:none">0</span></div>
   <div class="nav-item" data-view="reviews" onclick="navigate('reviews',this)"><span class="icon">📝</span> Reviews</div>
@@ -384,6 +386,7 @@ tr:last-child td{border-bottom:none}
   <div id="view-matrix" style="display:none"></div>
   <div id="view-admin" style="display:none"></div>
   <div id="view-myteam" class="view" style="display:none"></div>
+  <div id="view-mycareer" class="view" style="display:none"></div>
 </div>
 
 <!-- Modal: New/Edit Profile -->
@@ -426,6 +429,21 @@ tr:last-child td{border-bottom:none}
     <div class="form-group">
       <label class="form-label">Team</label>
       <input class="form-input" id="np-team" placeholder="e.g. Civil Engineering, Survey Operations"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Career Level (McKenzie Framework)</label>
+      <select class="form-select" id="np-career-level">
+        <option value="1">Level 1 – Graduate (1–2 yrs)</option>
+        <option value="2">Level 2 (3–4 yrs)</option>
+        <option value="3">Level 3 (5–6 yrs)</option>
+        <option value="4">Level 4 – Intermediate (6–7 yrs)</option>
+        <option value="5">Level 5 – Senior Level 1 (7–8 yrs)</option>
+        <option value="6">Level 6 – Senior Level 2 (8–10 yrs)</option>
+        <option value="7">Level 7 – Project / Team Lead (10+ yrs)</option>
+        <option value="8">Level 8 – Principal (15+ yrs)</option>
+        <option value="9">Level 9 – Director (20+ yrs)</option>
+        <option value="10">Level 10 – Managing Director (20+ yrs)</option>
+      </select>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -831,6 +849,48 @@ const MOOD_ICONS={positive:'😊',neutral:'😐',concern:'😟'};
 const MOOD_COLORS={positive:'badge-green',neutral:'badge-grey',concern:'badge-red'};
 const ROLE_HIERARCHY={'Director':6,'Principal Engineer':5,'Principal Surveyor':5,'Project Manager':4,'Senior Engineer':4,'Senior Surveyor':4,'Engineer':3,'Surveyor':3,'Graduate Engineer':2,'Graduate Surveyor':2};
 const IDEAL_TEAM={engineering:{'Principal Engineer':1,'Senior Engineer':2,'Engineer':2,'Graduate Engineer':1,'Project Manager':1},surveying:{'Principal Surveyor':1,'Senior Surveyor':2,'Surveyor':2,'Graduate Surveyor':1}};
+const MCK_LEVELS=[
+  {level:1,title:'Graduate',careerLength:'1–2 years',staffManaged:'None',profQual:false,
+   caps:{assigns:false,projCoord:false,qualLeadership:false,developsStaff:false,bizAcumen:false},
+   roles:'Civil Engineer, Surveyor, Planner, Project Manager, CAD Operator, Trainee Technician',
+   description:'Qualified Graduate Professional in their first and second year of full-time employment. Responsible for straightforward projects or sections of projects. Typically fulfils engineer, surveyor and project manager support roles.'},
+  {level:2,title:'Level 2',careerLength:'3–4 years',staffManaged:'None',profQual:false,
+   caps:{assigns:false,projCoord:false,qualLeadership:false,developsStaff:false,bizAcumen:false},
+   roles:'Civil Engineer, Surveyor, Planner, Project Manager, CAD Operator, Civil Technician',
+   description:'Qualified Graduate Professional in third or fourth year. Performs tasks under supervision. Assists Mid-level or Senior Professional. May check work of technicians/sub-contractors. Uses standard techniques for solving problems.'},
+  {level:3,title:'Level 3',careerLength:'5–6 years',staffManaged:'None',profQual:false,
+   caps:{assigns:false,projCoord:false,qualLeadership:false,developsStaff:false,bizAcumen:false},
+   roles:'Civil Engineer, Surveyor, Planner, Project Manager, CAD Operator, Civil Technician',
+   description:'May or may not be registered Professional. Ensures technical quality and completion on schedule and within budget. Liaises with client representatives. Plans and co-ordinates specific discipline or contracts within project.'},
+  {level:4,title:'Intermediate',careerLength:'6–7 years',staffManaged:'Maybe',profQual:'maybe',
+   caps:{assigns:true,projCoord:false,qualLeadership:false,developsStaff:false,bizAcumen:false},
+   roles:'Civil Engineer, Surveyor, Planner, Project Manager, CAD Operator, Civil Technician',
+   description:'Usually registered Professional. Provides independent specialised technical service. Assigns tasks and may supervise others. Plans implementation of project, co-ordinates, controls specific discipline or contracts. May organise/chair project meetings.'},
+  {level:5,title:'Senior Level 1',careerLength:'7–8 years',staffManaged:'1–4',profQual:true,
+   caps:{assigns:true,projCoord:true,qualLeadership:false,developsStaff:true,bizAcumen:false},
+   roles:'Civil Engineer, Surveyor, Planner, Project/Development Manager, CAD Operator, Civil Technician',
+   description:'Registered professional. Provides specialised technical service at a more senior level. May handle smaller projects solo. Ensures technical quality, completion on schedule and within budget. Supervises and develops other professionals.'},
+  {level:6,title:'Senior Level 2',careerLength:'8–10 years',staffManaged:'1–4',profQual:true,
+   caps:{assigns:true,projCoord:true,qualLeadership:true,developsStaff:true,bizAcumen:false},
+   roles:'Civil Engineer, Surveyor, Planner, Project/Development Manager, CAD Operator, Civil Technician',
+   description:'Manages major or multiple projects or contracts. Co-ordinates different groups and manages multi-disciplinary teams. Supervises project staff and responsible for performance reviews of direct reports. Establishes and maintains client relationships.'},
+  {level:7,title:'Project / Team Lead',careerLength:'10+ years',staffManaged:'4–8',profQual:true,
+   caps:{assigns:true,projCoord:true,qualLeadership:true,developsStaff:true,bizAcumen:true},
+   roles:'Engineering, Surveyor, Planner, Project/Development Manager',
+   description:'Manages a small operational group. Accountable for smooth running of large/complex projects. Establishes and maintains client relationships. Accountable for budgets and allocations of resources.'},
+  {level:8,title:'Principal',careerLength:'15+ years',staffManaged:'8+',profQual:true,
+   caps:{assigns:true,projCoord:true,qualLeadership:true,developsStaff:true,bizAcumen:true},
+   roles:'Engineering, Surveyor, Planner, Project/Development Manager',
+   description:'Manages a medium to large operational group. Accountable for smooth running of major/complex projects. Accountable for business development, marketing and HR in an operational group. May be recognised as national expert in field.'},
+  {level:9,title:'Director',careerLength:'20+ years',staffManaged:'10+',profQual:true,
+   caps:{assigns:true,projCoord:true,qualLeadership:true,developsStaff:true,bizAcumen:true},
+   roles:'Director',
+   description:'Tactical and strategic role providing direction and leadership to project teams. Maintains strong working relationship with clients. Oversees activities of multiple projects to ensure consistency with strategic plan. Typically fulfils the Project Director Role.'},
+  {level:10,title:'Managing Director',careerLength:'20+ years',staffManaged:'50+',profQual:true,
+   caps:{assigns:true,projCoord:true,qualLeadership:true,developsStaff:true,bizAcumen:true},
+   roles:'Managing Director',
+   description:'Most senior person in the organisation. Provides overall direction and management. Leads development of values and objectives. Develops and puts in place business strategies, plans and policies to achieve company goals.'},
+];
 
 // ══════════════════════════════════════════════════════════
 // STATE
@@ -892,7 +952,7 @@ async function load(){
   // Only seed demo data in local dev mode (not on live Azure site)
   if(!S.users.length && !_useAPI) seedDemo();
   // Migrations
-  S.users.forEach(u=>{if(typeof u.isAdmin==='undefined')u.isAdmin=false;});
+  S.users.forEach(u=>{if(typeof u.isAdmin==='undefined')u.isAdmin=false;if(!u.careerLevel)u.careerLevel=1;if(!u.pendingSkills)u.pendingSkills={};});
   S.materials.forEach(m=>{if(!Array.isArray(m.discTags))m.discTags=[];if(!Array.isArray(m.senTags))m.senTags=[];});
   save();
 }
@@ -1062,6 +1122,7 @@ function openNewProfileModal(){
   document.getElementById('np-exp').value='<1';
   document.getElementById('np-costrate').value='';document.getElementById('np-chargerate').value='';
   document.getElementById('np-isadmin').checked=false;
+  document.getElementById('np-career-level').value=1;
   populateManagerDropdown(null);
   document.getElementById('modal-profile').classList.add('open');
 }
@@ -1087,8 +1148,10 @@ function saveProfile(){
     chargeRate:parseFloat(document.getElementById('np-chargerate').value)||0,
     email,username:email,password:'',
     isAdmin:document.getElementById('np-isadmin').checked,
+    careerLevel:parseInt(document.getElementById('np-career-level').value)||1,
     goals:existing?existing.goals||[]:[],
     skills:existing?existing.skills||{}:{},
+    pendingSkills:existing?existing.pendingSkills||{}:{},
   };
   if(editId){const i=S.users.findIndex(u=>u.id===editId);if(i>=0)S.users[i]=prof;}
   else S.users.push(prof);
@@ -1109,13 +1172,13 @@ function navigate(view,el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   else document.querySelectorAll('.nav-item').forEach(n=>{if(n.dataset.view===view)n.classList.add('active');});
-  const views=['dashboard','goals','skills','training','mycourses','reviews','onetoones','experts','materials','matrix','admin','myteam'];
+  const views=['dashboard','goals','skills','mycareer','training','mycourses','reviews','onetoones','experts','materials','matrix','admin','myteam'];
   views.forEach(v=>document.getElementById('view-'+v).style.display=v===view?'':'none');
   renderView(view);
 }
 function renderAll(){renderView(S.view);}
 function renderView(v){
-  const m={dashboard:renderDashboard,goals:renderGoals,skills:renderSkills,training:renderTraining,mycourses:renderMyCourses,reviews:renderReviews,onetoones:renderOneToOnes,experts:renderExperts,materials:renderMaterials,matrix:renderMatrix,admin:renderAdmin,myteam:renderMyTeam};
+  const m={dashboard:renderDashboard,goals:renderGoals,skills:renderSkills,mycareer:renderMyCareer,training:renderTraining,mycourses:renderMyCourses,reviews:renderReviews,onetoones:renderOneToOnes,experts:renderExperts,materials:renderMaterials,matrix:renderMatrix,admin:renderAdmin,myteam:renderMyTeam};
   if(m[v])m[v]();
 }
 
@@ -1156,6 +1219,7 @@ function renderDashboard(){
     </div>
     ${gaps.length?`<div class="card mt-4"><div class="section-header"><h3>Top Skill Gaps</h3><button class="btn btn-primary btn-sm ml-auto" onclick="navigate('training',document.querySelector('[data-view=training]'))">Training Plan</button></div>
       <table><thead><tr><th>Skill</th><th>Level</th><th>Top Resource</th></tr></thead><tbody>${gaps.map(g=>{const r=(activeResources()[g.skill]||DEFAULT_RESOURCES)[0];return`<tr><td><strong>${g.skill}</strong></td><td>${renderDots(g.score)} <span class="badge ${g.score<=1?'badge-red':'badge-amber'}">${LEVEL_LABELS[g.score]}</span></td><td><a href="${r.url}" target="_blank" style="color:var(--moss);font-size:.78rem;text-decoration:none">${r.title}</a></td></tr>`;}).join('')}</tbody></table></div>`:''}
+    ${(()=>{const lvlNum=u.careerLevel||1;const lvl=getMckLevel(lvlNum);const nextLvl=lvlNum<10?getMckLevel(lvlNum+1):null;const capLabels=[{key:'assigns',label:'Assigns & Approves Work'},{key:'projCoord',label:'Project Coord & Quoting'},{key:'qualLeadership',label:'Quality & Technical Leadership'},{key:'developsStaff',label:'Develops Staff'},{key:'bizAcumen',label:'Business Acumen'}];return`<div class="card mt-4" style="margin-bottom:20px"><div class="section-header"><h3 style="font-size:.95rem;font-weight:700">Career Progression</h3><button class="btn btn-secondary btn-sm ml-auto" onclick="navigate('mycareer',document.querySelector('[data-view=mycareer]'))">Full Pathway →</button></div><div style="display:flex;gap:3px;margin-bottom:16px;flex-wrap:wrap">${MCK_LEVELS.map(l=>{const isCurrent=l.level===lvlNum;const isPast=l.level<lvlNum;return`<div style="flex:1;min-width:28px;text-align:center;padding:6px 2px;border-radius:5px;cursor:default;background:${isCurrent?'var(--moss)':isPast?'var(--moss-light)':'var(--sand-light)'};color:${isCurrent||isPast?'#fff':'var(--muted)'};font-size:${isCurrent?'.72rem':'.65rem'};font-weight:${isCurrent?'700':'500'};border:${isCurrent?'2px solid var(--moss-dark)':'1px solid transparent'}" title="Level ${l.level}: ${l.title}">${l.level}${isCurrent?`<br><span style="font-size:.55rem;line-height:1">${l.title.split(' ')[0]}</span>`:''}</div>`;}).join('')}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div><div style="font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Level ${lvlNum} — ${lvl.title}</div><div style="font-size:.78rem;color:var(--wood);margin-bottom:12px;line-height:1.5">${lvl.description.slice(0,160)}…</div><div style="font-size:.7rem;color:var(--muted)">📅 ${lvl.careerLength} &nbsp;·&nbsp; 👥 ${lvl.staffManaged} staff managed</div></div><div><div style="font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Capabilities</div>${capLabels.map(c=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:.75rem"><span style="font-size:.9rem">${lvl.caps[c.key]?'✅':'⬜'}</span><span style="color:${lvl.caps[c.key]?'var(--wood)':'var(--muted)'}">${c.label}</span></div>`).join('')}</div></div>${nextLvl?`<div style="margin-top:14px;padding:10px 14px;background:var(--sand-pale);border-radius:6px;border-left:3px solid var(--moss)"><div style="font-size:.72rem;font-weight:700;color:var(--moss);margin-bottom:3px">Next: Level ${nextLvl.level} — ${nextLvl.title} (${nextLvl.careerLength})</div><div style="font-size:.75rem;color:var(--wood)">${nextLvl.description.slice(0,120)}…</div>${Object.entries(nextLvl.caps).filter(([k,v])=>v&&!lvl.caps[k]).length?`<div style="font-size:.7rem;color:var(--muted);margin-top:4px">New capabilities unlocked: ${Object.entries(nextLvl.caps).filter(([k,v])=>v&&!lvl.caps[k]).map(([k])=>capLabels.find(c=>c.key===k)?.label).filter(Boolean).join(', ')}</div>`:''}</div>`:'<div style="margin-top:12px;text-align:center"><span class="badge badge-green">🏆 Most senior level</span></div>'}</div>`;})()}
     ${reports.length?`<div class="card mt-4"><div class="card-title">My Team &mdash; Direct Reports</div><table><thead><tr><th>Name</th><th>Role</th><th>Skills</th><th>Avg</th><th>Goals</th></tr></thead><tbody>${reports.map(r=>{const rt=Object.keys(r.skills||{}).length;const av=rt?(Object.values(r.skills).reduce((a,b)=>a+b,0)/rt).toFixed(1):'—';return`<tr><td><strong>${r.name}</strong></td><td>${r.role}</td><td>${rt}</td><td>${av}</td><td>${(r.goals||[]).filter(g=>g.status==='in-progress').length}</td></tr>`;}).join('')}</tbody></table></div>`:''}
     <div style="text-align:right;margin-top:24px"><button class="btn btn-secondary btn-sm" onclick="logout()">Sign Out</button></div>
   `;
@@ -1181,9 +1245,70 @@ function deleteGoal(id){if(!confirm('Delete this goal?'))return;S.currentUser.go
 // ══════════════════════════════════════════════════════════
 // SKILLS
 // ══════════════════════════════════════════════════════════
-function renderSkills(){const u=S.currentUser;if(!u)return;const catalog=getSkillsCatalog(u.discipline);const rated=Object.keys(u.skills||{}).length;const total=Object.values(catalog).flat().length;let html=`<div class="page-title">Skills Assessment</div><div class="page-sub">Rate your proficiency honestly. This drives your training plan.</div><div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px 18px"><div style="flex:1"><div style="font-size:.75rem;color:var(--muted);margin-bottom:6px">${rated} of ${total} skills assessed</div><div class="progress-wrap"><div class="progress-fill pf-4" style="width:${Math.round(rated/total*100)}%"></div></div></div><div style="font-size:.86rem;font-weight:700;color:var(--moss)">${Math.round(rated/total*100)}%</div></div><div style="background:var(--sand-pale);border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:.75rem;color:var(--muted)"><strong>Rating:</strong> 1=Awareness  2=Basic  3=Proficient  4=Advanced  5=Expert</div>`;
-  for(const[cat,skills]of Object.entries(catalog)){html+=`<div class="skill-category"><div class="skill-cat-title">${cat}</div>`;for(const skill of skills){const cur=(u.skills||{})[skill]||0;html+=`<div class="skill-row" id="srow-${slug(skill)}"><div class="skill-row-name">${skill}</div><div class="rating-row">${[1,2,3,4,5].map(n=>`<div class="rating-btn ${cur===n?'sel-'+n:''}" onclick="setSkill('${skill}',${n})">${n}</div>`).join('')}</div><div class="skill-row-level">${cur?LEVEL_LABELS[cur]:'<span style="color:var(--sand)">Not rated</span>'}</div></div>`;}html+='</div>';}document.getElementById('view-skills').innerHTML=html;}
-function setSkill(skill,level){if(!S.currentUser.skills)S.currentUser.skills={};S.currentUser.skills[skill]=level;save();const row=document.getElementById('srow-'+slug(skill));if(row){row.querySelectorAll('.rating-btn').forEach((b,i)=>{b.className='rating-btn'+(i+1===level?' sel-'+(i+1):'');});row.querySelector('.skill-row-level').innerHTML=LEVEL_LABELS[level];}}
+function renderSkills(){
+  const u=S.currentUser;if(!u)return;
+  const catalog=getSkillsCatalog(u.discipline);
+  const rated=Object.keys(u.skills||{}).length;
+  const total=Object.values(catalog).flat().length;
+  const hasMgr=!!u.manager;
+  const pending=u.pendingSkills||{};
+  const pendingCount=Object.keys(pending).length;
+
+  let html=`<div class="page-title">Skills Assessment</div>
+  <div class="page-sub">Rate your proficiency in each skill area.</div>
+  ${hasMgr?`<div style="background:#fef3e0;border:1px solid var(--amber);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.8rem">
+    <strong>📋 Manager approval required</strong> — your ratings are submitted to your manager for approval before becoming official.
+    ${pendingCount?`<strong>${pendingCount} rating${pendingCount!==1?'s':''} awaiting approval.</strong>`:''}
+  </div>`:''}
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px 18px"><div style="flex:1"><div style="font-size:.75rem;color:var(--muted);margin-bottom:6px">${rated} of ${total} skills approved</div><div class="progress-wrap"><div class="progress-fill pf-4" style="width:${Math.round(rated/total*100)}%"></div></div></div><div style="font-size:.86rem;font-weight:700;color:var(--moss)">${Math.round(rated/total*100)}%</div></div>
+  <div style="background:var(--sand-pale);border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:.75rem;color:var(--muted)"><strong>Rating:</strong> 1=Awareness &nbsp; 2=Basic &nbsp; 3=Proficient &nbsp; 4=Advanced &nbsp; 5=Expert</div>`;
+
+  for(const[cat,skills]of Object.entries(catalog)){
+    html+=`<div class="skill-category"><div class="skill-cat-title">${cat}</div>`;
+    for(const skill of skills){
+      const approved=(u.skills||{})[skill]||0;
+      const pendingVal=pending[skill]||0;
+      const displayVal=pendingVal||approved;
+      const isPending=hasMgr&&pendingVal>0;
+      html+=`<div class="skill-row" id="srow-${slug(skill)}">
+        <div class="skill-row-name">${skill}</div>
+        <div class="rating-row">${[1,2,3,4,5].map(n=>{
+          const isDisplay=n===displayVal;
+          let cls='rating-btn';
+          if(isDisplay){cls+=isPending?' sel-pending':' sel-'+n;}
+          return`<div class="${cls}" onclick="setSkill('${skill}',${n})">${n}</div>`;
+        }).join('')}</div>
+        <div class="skill-row-level">${isPending
+          ?`<span class="badge badge-amber" style="font-size:.65rem">⏳ ${LEVEL_LABELS[pendingVal]} — pending</span>`
+          :(approved?LEVEL_LABELS[approved]:'<span style="color:var(--sand)">Not rated</span>')
+        }${isPending&&approved?`<br><span style="font-size:.65rem;color:var(--muted)">Current: ${LEVEL_LABELS[approved]}</span>`:''}
+        </div>
+      </div>`;
+    }
+    html+='</div>';
+  }
+  document.getElementById('view-skills').innerHTML=html;
+}
+function setSkill(skill,level){
+  const u=S.currentUser;if(!u)return;
+  if(!u.skills)u.skills={};
+  if(!u.pendingSkills)u.pendingSkills={};
+  if(u.manager){
+    u.pendingSkills[skill]=level;
+  }else{
+    u.skills[skill]=level;
+  }
+  save();
+  const row=document.getElementById('srow-'+slug(skill));
+  if(row){
+    const isPending=!!u.manager;
+    row.querySelectorAll('.rating-btn').forEach((b,i)=>{b.className='rating-btn'+(i+1===level?(isPending?' sel-pending':' sel-'+level):'');});
+    const lvlEl=row.querySelector('.skill-row-level');
+    if(lvlEl)lvlEl.innerHTML=isPending
+      ?`<span class="badge badge-amber" style="font-size:.65rem">⏳ ${LEVEL_LABELS[level]} — pending</span>`
+      :LEVEL_LABELS[level];
+  }
+}
 
 // ══════════════════════════════════════════════════════════
 // TRAINING PLAN
@@ -1451,6 +1576,152 @@ function renderMatrix(){const users=S.users;if(!users.length){document.getElemen
   document.getElementById('view-matrix').innerHTML=`<div class="page-title">Company Skills Matrix</div><div class="page-sub">${users.length} staff · ${allSkills.length} skills · Admin view</div><div class="stat-grid"><div class="stat-card accent"><div class="s-label">Staff</div><div class="s-value">${users.length}</div></div><div class="stat-card accent3"><div class="s-label">Skills</div><div class="s-value">${allSkills.length}</div></div><div class="stat-card accent5"><div class="s-label">Critical Gaps</div><div class="s-value">${criticalGaps.length}</div><div class="s-note">avg &lt; 2.5</div></div></div>${criticalGaps.length?`<div class="card mb-6" style="border-left:3px solid var(--red)"><div class="card-title">Critical Gaps</div><div class="card-sub">Team average below 2.5</div><div style="display:flex;flex-wrap:wrap;gap:6px">${criticalGaps.map(s=>`<span style="display:inline-flex;align-items:center;gap:4px;background:#fde8e8;color:var(--red);padding:4px 10px;border-radius:16px;font-size:.75rem;font-weight:600">${s} <span style="background:var(--red);color:#fff;padding:1px 5px;border-radius:6px;font-size:.65rem">${skillAvgs[s]}</span></span>`).join('')}</div></div>`:''}<div class="card mb-6"><div class="card-title">Staff x Skills</div><div class="matrix-wrap" style="max-height:640px;overflow:auto;margin-top:14px"><table class="matrix-table"><thead><tr><th class="col-name">Name</th><th class="col-role">Role</th><th class="col-team">Team</th>${allSkills.map(s=>`<th class="col-skill">${s}</th>`).join('')}</tr></thead><tbody>${teams.map(team=>`<tr class="team-header-row"><td colspan="${3+allSkills.length}">${team} (${byTeam[team].length})</td></tr>${byTeam[team].map(u=>`<tr><td style="white-space:nowrap"><div style="display:flex;align-items:center;gap:8px"><div style="width:26px;height:26px;border-radius:50%;background:var(--moss);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;flex-shrink:0">${ini(u.name)}</div><div>${u.name}</div></div></td><td><span class="badge badge-navy">${u.role}</span></td><td>${u.team||'—'}</td>${allSkills.map(s=>{const v=(u.skills||{})[s];return`<td><div class="mc mc-${v||0}">${v||'—'}</div></td>`;}).join('')}</tr>`).join('')}`).join('')}<tr style="background:var(--sand-pale);border-top:2px solid var(--border)"><td colspan="3" style="font-weight:700;font-size:.75rem;color:var(--muted)">AVERAGE</td>${allSkills.map(s=>{const avg=skillAvgs[s];const cl=avg?(parseFloat(avg)<2?'mc-1':parseFloat(avg)<3?'mc-2':parseFloat(avg)<4?'mc-3':parseFloat(avg)<5?'mc-4':'mc-5'):'mc-0';return`<td><div class="mc ${cl}" style="font-size:.68rem">${avg||'—'}</div></td>`;}).join('')}</tr></tbody></table></div></div>`;}
 
 // ══════════════════════════════════════════════════════════
+// MY CAREER
+// ══════════════════════════════════════════════════════════
+function renderMyCareer(){
+  const u=S.currentUser;if(!u)return;
+  const lvlNum=u.careerLevel||1;
+  const capLabels=[
+    {key:'assigns',label:'Assigns & Approves Work'},
+    {key:'projCoord',label:'Project Coord & Quoting'},
+    {key:'qualLeadership',label:'Quality & Technical Leadership'},
+    {key:'developsStaff',label:'Develops Staff'},
+    {key:'bizAcumen',label:'Business Acumen'},
+  ];
+
+  document.getElementById('view-mycareer').innerHTML=`
+    <div class="page-title">My Career Path</div>
+    <div class="page-sub">McKenzie & Co. Career Development Framework — your current level is highlighted</div>
+
+    <div style="overflow-x:auto;margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse;font-size:.78rem;min-width:700px">
+        <thead>
+          <tr style="background:var(--wood);color:#fff">
+            <th style="padding:10px 12px;text-align:center;width:50px">Level</th>
+            <th style="padding:10px 12px;text-align:left;width:130px">Title</th>
+            <th style="padding:10px 12px;text-align:center">Career Length</th>
+            <th style="padding:10px 12px;text-align:center">Staff Managed</th>
+            <th style="padding:10px 12px;text-align:center">Prof. Qual</th>
+            ${capLabels.map(c=>`<th style="padding:6px 4px;text-align:center;font-size:.6rem;white-space:normal;line-height:1.2;width:70px">${c.label}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${MCK_LEVELS.slice().reverse().map(l=>{
+            const isCurrent=l.level===lvlNum;
+            const rowBg=isCurrent?'var(--moss)':'';
+            const rowColor=isCurrent?'#fff':'';
+            const borderStyle=isCurrent?'border:3px solid var(--moss-dark)':'border-bottom:1px solid var(--border)';
+            return`<tr style="background:${rowBg};color:${rowColor};${borderStyle};cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'table-row':'none'">
+              <td style="padding:10px 8px;text-align:center;font-weight:800;font-size:1.1rem">${l.level}</td>
+              <td style="padding:10px 12px;font-weight:700">${l.title}${isCurrent?'<br><span style="font-size:.62rem;font-weight:500;opacity:.85">← You are here</span>':''}</td>
+              <td style="padding:10px 8px;text-align:center">${l.careerLength}</td>
+              <td style="padding:10px 8px;text-align:center">${l.staffManaged}</td>
+              <td style="padding:10px 8px;text-align:center">${l.profQual===true?'✅':l.profQual==='maybe'?'⬜ Maybe':'—'}</td>
+              ${capLabels.map(c=>`<td style="padding:10px 4px;text-align:center">${l.caps[c.key]?'✅':'—'}</td>`).join('')}
+            </tr>
+            <tr style="display:none;background:${isCurrent?'#2d5a24':'var(--sand-pale)'}">
+              <td colspan="${6+capLabels.length}" style="padding:12px 16px">
+                <div style="font-size:.75rem;color:${isCurrent?'rgba(255,255,255,.9)':'var(--wood)'};margin-bottom:6px"><strong>Typical roles:</strong> ${l.roles}</div>
+                <div style="font-size:.75rem;color:${isCurrent?'rgba(255,255,255,.85)':'var(--muted)'};">${l.description}</div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div style="font-size:.7rem;color:var(--muted);margin-top:6px">Click any row to expand the description. Your career level is set by your manager.</div>
+    </div>
+
+    <div class="card">
+      <div class="section-header"><h3 style="font-size:.95rem;font-weight:700">Your Current Level — Level ${lvlNum}: ${getMckLevel(lvlNum).title}</h3></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">About This Level</div>
+          <p style="font-size:.8rem;color:var(--wood);line-height:1.6">${getMckLevel(lvlNum).description}</p>
+          <div style="margin-top:12px;font-size:.75rem;color:var(--muted)">📅 <strong>Career length:</strong> ${getMckLevel(lvlNum).careerLength}</div>
+          <div style="font-size:.75rem;color:var(--muted)">👥 <strong>Staff managed:</strong> ${getMckLevel(lvlNum).staffManaged}</div>
+          <div style="font-size:.75rem;color:var(--muted)">🎓 <strong>Professional qualification:</strong> ${getMckLevel(lvlNum).profQual===true?'Required':getMckLevel(lvlNum).profQual==='maybe'?'May be required':'Not required'}</div>
+        </div>
+        <div>
+          <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Capabilities at This Level</div>
+          ${capLabels.map(c=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:1rem">${getMckLevel(lvlNum).caps[c.key]?'✅':'⬜'}</span>
+            <span style="font-size:.8rem;color:${getMckLevel(lvlNum).caps[c.key]?'var(--wood)':'var(--muted)'};font-weight:${getMckLevel(lvlNum).caps[c.key]?'600':'400'}">${c.label}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════
+// SKILL APPROVAL
+// ══════════════════════════════════════════════════════════
+function openSkillApprove(userId){
+  const u=S.users.find(x=>x.id===userId);if(!u)return;
+  const pending=u.pendingSkills||{};
+  document.getElementById('skill-approve-uid').value=userId;
+  document.getElementById('skill-approve-member').textContent=u.name+' — '+Object.keys(pending).length+' pending rating'+(Object.keys(pending).length!==1?'s':'');
+  if(!Object.keys(pending).length){
+    document.getElementById('skill-approve-list').innerHTML='<div style="color:var(--muted);font-size:.8rem;padding:12px 0">No pending skill ratings for this team member.</div>';
+  }else{
+    document.getElementById('skill-approve-list').innerHTML=`
+      <table style="width:100%;font-size:.8rem;border-collapse:collapse">
+        <thead><tr>
+          <th style="text-align:left;padding:6px 4px;border-bottom:2px solid var(--border);color:var(--muted);font-size:.68rem;font-weight:700">Skill</th>
+          <th style="text-align:center;padding:6px 4px;border-bottom:2px solid var(--border);color:var(--muted);font-size:.68rem;font-weight:700">Current</th>
+          <th style="text-align:center;padding:6px 4px;border-bottom:2px solid var(--border);color:var(--muted);font-size:.68rem;font-weight:700">Proposed</th>
+          <th style="text-align:center;padding:6px 4px;border-bottom:2px solid var(--border);color:var(--muted);font-size:.68rem;font-weight:700">Your Decision</th>
+        </tr></thead>
+        <tbody>
+          ${Object.entries(pending).map(([skill,proposed])=>{
+            const current=(u.skills||{})[skill]||0;
+            return`<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 4px;font-weight:500">${skill}</td>
+              <td style="text-align:center;padding:8px 4px">${current?renderDots(current):'<span style="color:var(--muted)">—</span>'}</td>
+              <td style="text-align:center;padding:8px 4px">${renderDots(proposed)} <span class="badge badge-amber" style="font-size:.62rem">${LEVEL_LABELS[proposed]}</span></td>
+              <td style="text-align:center;padding:8px 4px">
+                <select class="form-select" id="sa-${slug(skill)}" style="font-size:.75rem;padding:4px">
+                  <option value="approve">✓ Approve (${LEVEL_LABELS[proposed]})</option>
+                  <option value="keep">${current?'Keep current ('+LEVEL_LABELS[current]+')':'Reject (remove)'}</option>
+                  <option value="1">Set: 1 – Awareness</option>
+                  <option value="2">Set: 2 – Basic</option>
+                  <option value="3">Set: 3 – Proficient</option>
+                  <option value="4">Set: 4 – Advanced</option>
+                  <option value="5">Set: 5 – Expert</option>
+                </select>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  }
+  document.getElementById('modal-skill-approve').classList.add('open');
+}
+
+function approveAllSkills(){
+  document.querySelectorAll('#skill-approve-list select').forEach(sel=>{sel.value='approve';});
+}
+
+function saveSkillApprovals(){
+  const userId=document.getElementById('skill-approve-uid').value;
+  const u=S.users.find(x=>x.id===userId);if(!u)return;
+  const pending=u.pendingSkills||{};
+  if(!u.skills)u.skills={};
+  Object.entries(pending).forEach(([skill,proposed])=>{
+    const sel=document.getElementById('sa-'+slug(skill));
+    if(!sel)return;
+    const val=sel.value;
+    if(val==='approve'){u.skills[skill]=proposed;}
+    else if(val==='keep'){/* leave skills[skill] unchanged */}
+    else{u.skills[skill]=parseInt(val);}
+  });
+  u.pendingSkills={};
+  save();
+  closeModal('modal-skill-approve');
+  renderMyTeam();
+}
+
+// ══════════════════════════════════════════════════════════
 // MY TEAM
 // ══════════════════════════════════════════════════════════
 function renderMyTeam(){
@@ -1512,10 +1783,7 @@ function renderMyTeam(){
               <div><span style="color:var(--muted)">CPD ${currentYear}</span> <strong>${mCpd} hrs</strong></div>
             </div>
             ${mAssign.length?`<div class="progress-wrap" style="margin-bottom:10px"><div class="progress-fill pf-4" style="width:${mAssign.length?Math.round(mDone/mAssign.length*100):0}%"></div></div>`:''}
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <div style="font-size:.7rem;color:var(--muted)">Last review: ${lastRev?lastRev.date:'None'}</div>
-              ${S.adminUnlocked?`<button class="btn btn-secondary btn-sm" onclick="switchToUser('${m.id}')">View Profile</button>`:''}
-            </div>
+            ${(()=>{const pendingSkillCount=Object.keys(m.pendingSkills||{}).length;return`<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px"><div style="font-size:.7rem;color:var(--muted)">Last review: ${lastRev?lastRev.date:'None'}</div><div style="display:flex;gap:6px;flex-wrap:wrap">${pendingSkillCount?`<button class="btn btn-primary btn-sm" onclick="openSkillApprove('${m.id}')">⏳ Approve ${pendingSkillCount} Skill${pendingSkillCount!==1?'s':''}</button>`:'<span class="badge badge-green" style="align-self:center">✓ Skills up to date</span>'}${S.adminUnlocked?`<button class="btn btn-secondary btn-sm" onclick="switchToUser('${m.id}')">View Profile</button>`:''}</div></div>`;})()}
           </div>`;
         }).join('')}
       </div>
@@ -2022,7 +2290,7 @@ Priya Sharma,Surveyor,surveying,3-5,Survey Operations,Sarah Chen,55,120,priya.sh
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mckenzie-growth-staff-template.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 
-function editProfile(id){const u=S.users.find(x=>x.id===id);if(!u)return;document.getElementById('mp-title').textContent='Edit Profile';document.getElementById('np-edit-id').value=id;document.getElementById('np-name').value=u.name;document.getElementById('np-role').value=u.role;document.getElementById('np-disc').value=u.discipline;document.getElementById('np-exp').value=u.experience;document.getElementById('np-team').value=u.team||'';document.getElementById('np-costrate').value=u.costRate||'';document.getElementById('np-chargerate').value=u.chargeRate||'';document.getElementById('np-email').value=u.email||'';document.getElementById('np-isadmin').checked=!!u.isAdmin;populateManagerDropdown(id);document.getElementById('np-manager').value=u.manager||'';document.getElementById('modal-profile').classList.add('open');}
+function editProfile(id){const u=S.users.find(x=>x.id===id);if(!u)return;document.getElementById('mp-title').textContent='Edit Profile';document.getElementById('np-edit-id').value=id;document.getElementById('np-name').value=u.name;document.getElementById('np-role').value=u.role;document.getElementById('np-disc').value=u.discipline;document.getElementById('np-exp').value=u.experience;document.getElementById('np-team').value=u.team||'';document.getElementById('np-costrate').value=u.costRate||'';document.getElementById('np-chargerate').value=u.chargeRate||'';document.getElementById('np-email').value=u.email||'';document.getElementById('np-isadmin').checked=!!u.isAdmin;document.getElementById('np-career-level').value=u.careerLevel||1;populateManagerDropdown(id);document.getElementById('np-manager').value=u.manager||'';document.getElementById('modal-profile').classList.add('open');}
 function switchToUser(id){selectUser(id);navigate('dashboard',document.querySelector('[data-view=dashboard]'));}
 function deleteUser(id){if(!confirm('Delete?'))return;S.users=S.users.filter(u=>u.id!==id);S.assignments=S.assignments.filter(a=>a.userId!==id);S.reviews=S.reviews.filter(r=>r.userId!==id);S.onetoones=S.onetoones.filter(o=>o.userId!==id&&o.withId!==id);if(S.currentUser&&S.currentUser.id===id){S.currentUser=null;S.adminUnlocked=false;updateHeader();updateAdminNav();}save();renderAdmin();}
 function removeAssignment(id){if(!confirm('Remove?'))return;S.assignments=S.assignments.filter(a=>a.id!==id);save();updateAssignedBadge();renderAdmin();}
@@ -2034,6 +2302,7 @@ function exportCSV(){const allSkills=[...new Set(S.users.flatMap(u=>Object.keys(
 // ══════════════════════════════════════════════════════════
 function activeCatalog(){return S.skillsCatalog||SKILLS;}
 function activeResources(){return S.resources||RESOURCES;}
+function getMckLevel(n){return MCK_LEVELS.find(l=>l.level===n)||MCK_LEVELS[0];}
 function getSkillsCatalog(d){const cat=activeCatalog();if(d==='both'){const r={};for(const[c,s]of Object.entries(cat.engineering||{}))r['Eng: '+c]=s;for(const[c,s]of Object.entries(cat.surveying||{}))r['Surv: '+c]=s;return r;}return cat[d]||cat.engineering||{};}
 function getSkillsFlat(d){return Object.values(getSkillsCatalog(d)).flat();}
 function buildPlan(u){const goalSkills=new Set();(u.goals||[]).filter(g=>g.status!=='completed').forEach(g=>{if(g.skills)g.skills.split(',').map(s=>s.trim()).filter(Boolean).forEach(s=>goalSkills.add(s));});const gaps=[];getSkillsFlat(u.discipline).forEach(skill=>{const score=(u.skills||{})[skill]||0;if(score>0&&score<=3)gaps.push({skill,score,goalLinked:goalSkills.has(skill)});else if(score===0&&goalSkills.has(skill))gaps.push({skill,score:0,goalLinked:true});});return gaps.sort((a,b)=>(b.goalLinked-a.goalLinked)||a.score-b.score);}
@@ -2057,5 +2326,20 @@ document.addEventListener('click',e=>{if(e.target.classList.contains('modal-over
   await doMicrosoftLogin();
 })();
 </script>
+
+<div class="modal-overlay" id="modal-skill-approve">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-title">Approve Skill Ratings</div>
+    <div class="modal-sub">Review and approve your team member's self-assessed skill ratings.</div>
+    <div id="skill-approve-member" style="font-size:.82rem;font-weight:600;color:var(--wood);margin-bottom:12px"></div>
+    <div id="skill-approve-list"></div>
+    <input type="hidden" id="skill-approve-uid"/>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-skill-approve')">Cancel</button>
+      <button class="btn btn-secondary" onclick="approveAllSkills()">Approve All</button>
+      <button class="btn btn-primary" onclick="saveSkillApprovals()">Save Approvals</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
