@@ -307,6 +307,7 @@ tr:last-child td{border-bottom:none}
 .divider{text-align:center;color:var(--muted);font-size:.75rem;margin:14px 0;position:relative}
 .divider::before,.divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--border)}
 .divider::before{left:0}.divider::after{right:0}
+.admin-doc-panel{padding:12px 0;}
 </style>
 </head>
 <body>
@@ -365,6 +366,7 @@ tr:last-child td{border-bottom:none}
   <div class="nav-item" data-view="mycourses" onclick="navigate('mycourses',this)"><span class="icon">🎓</span> My Courses <span class="nav-badge" id="nb-assigned" style="display:none">0</span></div>
   <div class="nav-item" data-view="reviews" onclick="navigate('reviews',this)"><span class="icon">📝</span> Reviews</div>
   <div class="nav-item" data-view="onetoones" onclick="navigate('onetoones',this)"><span class="icon">🤝</span> One-to-Ones</div>
+  <div class="nav-item" data-view="mydocs" onclick="navigate('mydocs',this)"><span class="icon">📁</span> My Docs</div>
   <div class="nav-item" data-view="disclosures" onclick="navigate('disclosures',this)"><span class="icon">🔒</span> Raise a Concern</div>
   <div class="nav-item" data-view="experts" onclick="navigate('experts',this)"><span class="icon">🏆</span> Technical Experts</div>
   <div class="nav-section exec-only" style="display:none">Management</div>
@@ -389,6 +391,7 @@ tr:last-child td{border-bottom:none}
   <div id="view-admin" style="display:none"></div>
   <div id="view-myteam" class="view" style="display:none"></div>
   <div id="view-mycareer" class="view" style="display:none"></div>
+  <div id="view-mydocs" style="display:none"></div>
 </div>
 
 <!-- Modal: New/Edit Profile -->
@@ -837,6 +840,71 @@ Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen
   </div>
 </div>
 
+<!-- Modal: Document -->
+<div class="modal-overlay" id="modal-doc">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title" id="doc-modal-title">Add Document</div>
+    <div class="form-group" id="doc-for-group" style="display:none">
+      <label class="form-label">Staff Member</label>
+      <select class="form-select" id="doc-for-user"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Title *</label>
+      <input class="form-input" id="doc-title" placeholder="e.g. Employment Agreement 2024"/>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Document Type *</label>
+        <select class="form-select" id="doc-type">
+          <option value="">Select type…</option>
+          <option value="employment-agreement">📋 Employment Agreement</option>
+          <option value="offer-letter">✉️ Offer Letter</option>
+          <option value="salary-review">💰 Salary Review</option>
+          <option value="pip">📈 Performance Plan</option>
+          <option value="certificate">🏅 Certificate / Qualification</option>
+          <option value="training-cert">🎓 Training Certificate</option>
+          <option value="reference">⭐ Reference / Testimonial</option>
+          <option value="contract">📝 Contract</option>
+          <option value="other">📄 Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Document Date</label>
+        <input class="form-input" id="doc-date" type="date"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="form-input" id="doc-description" rows="2" placeholder="Brief description…" style="resize:vertical"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Link (SharePoint, OneDrive, etc.)</label>
+      <input class="form-input" id="doc-url" type="url" placeholder="https://…"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Or upload a file <span style="color:var(--muted);font-size:.72rem">(max 1MB)</span></label>
+      <div class="upload-zone" id="doc-upload-zone" onclick="document.getElementById('doc-file').click()" style="padding:16px;text-align:center;cursor:pointer">
+        <div id="doc-upload-text" style="font-size:.8rem;color:var(--muted)">Click to choose file, or drag here</div>
+        <input type="file" id="doc-file" style="display:none" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onchange="handleDocFile(event)"/>
+      </div>
+    </div>
+    <div class="form-group" id="doc-adminonly-group" style="display:none">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem">
+        <input type="checkbox" id="doc-admin-only" style="width:16px;height:16px"/>
+        Admin only (hidden from staff view)
+      </label>
+    </div>
+    <input type="hidden" id="doc-edit-id"/>
+    <input type="hidden" id="doc-file-data"/>
+    <input type="hidden" id="doc-file-name"/>
+    <input type="hidden" id="doc-file-size"/>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-doc')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDoc()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════════════════
 // SKILLS CATALOG
@@ -877,6 +945,17 @@ const GOAL_ICONS={Technical:'⚙️',Professional:'💼',Leadership:'👥',Certi
 const TF_LABELS={short:'0–6 mo',medium:'6–18 mo',long:'18 mo+'};
 const STATUS_BADGE={'not-started':'badge-grey','in-progress':'badge-teal','completed':'badge-green','on-hold':'badge-amber'};
 const PRI_BADGE={high:'badge-red',medium:'badge-amber',low:'badge-navy'};
+const DOC_TYPES={
+  'employment-agreement':{label:'Employment Agreement',icon:'📋'},
+  'offer-letter':{label:'Offer Letter',icon:'✉️'},
+  'salary-review':{label:'Salary Review',icon:'💰'},
+  'pip':{label:'Performance Plan',icon:'📈'},
+  'certificate':{label:'Certificate / Qualification',icon:'🏅'},
+  'training-cert':{label:'Training Certificate',icon:'🎓'},
+  'reference':{label:'Reference / Testimonial',icon:'⭐'},
+  'contract':{label:'Contract',icon:'📝'},
+  'other':{label:'Other',icon:'📄'},
+};
 const MAT_COLORS={PDF:'#c0392b',Video:'#6b3fa0',Slides:'#c87030',Link:'#3a6a70',Guide:'#48773c',Assessment:'#d4880f'};
 const MOOD_ICONS={positive:'😊',neutral:'😐',concern:'😟'};
 const MOOD_COLORS={positive:'badge-green',neutral:'badge-grey',concern:'badge-red'};
@@ -928,7 +1007,7 @@ const MCK_LEVELS=[
 // ══════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════
-let S={currentUser:null,users:[],materials:[],assignments:[],reviews:[],onetoones:[],skillsCatalog:null,resources:null,cpdLog:[],technicalExperts:[],disclosures:[],disclosureContact:'',view:'dashboard',adminUnlocked:false};
+let S={currentUser:null,users:[],materials:[],assignments:[],reviews:[],onetoones:[],skillsCatalog:null,resources:null,cpdLog:[],technicalExperts:[],disclosures:[],disclosureContact:'',docs:[],view:'dashboard',adminUnlocked:false};
 let pendingFileData=null;
 
 // ══════════════════════════════════════════════════════════
@@ -951,12 +1030,13 @@ function save(){
   localStorage.setItem('mck_techexperts', JSON.stringify(S.technicalExperts));
   localStorage.setItem('mck_disclosures', JSON.stringify(S.disclosures));
   localStorage.setItem('mck_disccontact', S.disclosureContact||'');
+  localStorage.setItem('mck_docs', JSON.stringify(S.docs));
   // Debounce API saves (300ms) so rapid changes don't flood the server
   if(_useAPI){
     clearTimeout(_saveTimer);
     _saveTimer=setTimeout(()=>{
       fetch('/api/saveData',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({users:S.users,materials:S.materials,assignments:S.assignments,reviews:S.reviews,onetoones:S.onetoones,skillsCatalog:S.skillsCatalog,resources:S.resources,cpdLog:S.cpdLog,technicalExperts:S.technicalExperts,disclosures:S.disclosures,disclosureContact:S.disclosureContact})
+        body:JSON.stringify({users:S.users,materials:S.materials,assignments:S.assignments,reviews:S.reviews,onetoones:S.onetoones,skillsCatalog:S.skillsCatalog,resources:S.resources,cpdLog:S.cpdLog,technicalExperts:S.technicalExperts,disclosures:S.disclosures,disclosureContact:S.disclosureContact,docs:S.docs})
       }).catch(err=>console.warn('API save failed, data safe in localStorage:',err));
     },300);
   }
@@ -976,6 +1056,7 @@ async function load(){
       S.technicalExperts=data.technicalExperts||[];
       S.disclosures=data.disclosures||[];
       S.disclosureContact=data.disclosureContact||'';
+      S.docs=data.docs||[];
       _useAPI=true;
     }else throw new Error('API returned '+res.status);
   }catch(e){
@@ -991,6 +1072,7 @@ async function load(){
     try{S.technicalExperts=JSON.parse(localStorage.getItem('mck_techexperts')||'[]');}catch(e){S.technicalExperts=[];}
     try{S.disclosures=JSON.parse(localStorage.getItem('mck_disclosures')||'[]');}catch(e){S.disclosures=[];}
     try{S.disclosureContact=localStorage.getItem('mck_disccontact')||'';}catch(e){S.disclosureContact='';}
+    try{S.docs=JSON.parse(localStorage.getItem('mck_docs')||'[]');}catch(e){S.docs=[];}
   }
   // Only seed demo data in local dev mode (not on live Azure site)
   if(!S.users.length && !_useAPI) seedDemo();
@@ -1255,13 +1337,13 @@ function navigate(view,el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   else document.querySelectorAll('.nav-item').forEach(n=>{if(n.dataset.view===view)n.classList.add('active');});
-  const views=['dashboard','goals','skills','mycareer','training','mycourses','reviews','onetoones','disclosures','experts','materials','matrix','admin','myteam'];
+  const views=['dashboard','goals','skills','mycareer','training','mycourses','reviews','onetoones','disclosures','experts','materials','matrix','admin','myteam','mydocs'];
   views.forEach(v=>document.getElementById('view-'+v).style.display=v===view?'':'none');
   renderView(view);
 }
 function renderAll(){renderView(S.view);}
 function renderView(v){
-  const m={dashboard:renderDashboard,goals:renderGoals,skills:renderSkills,mycareer:renderMyCareer,training:renderTraining,mycourses:renderMyCourses,reviews:renderReviews,onetoones:renderOneToOnes,disclosures:renderDisclosures,experts:renderExperts,materials:renderMaterials,matrix:renderMatrix,admin:renderAdmin,myteam:renderMyTeam};
+  const m={dashboard:renderDashboard,goals:renderGoals,skills:renderSkills,mycareer:renderMyCareer,training:renderTraining,mycourses:renderMyCourses,reviews:renderReviews,onetoones:renderOneToOnes,disclosures:renderDisclosures,experts:renderExperts,materials:renderMaterials,matrix:renderMatrix,admin:renderAdmin,myteam:renderMyTeam,mydocs:renderMyDocs};
   if(m[v])m[v]();
 }
 
@@ -1655,6 +1737,186 @@ function renderOneToOnes(){
 function openOtoModal(){document.getElementById('oto-modal-title').textContent='Record One-to-One';document.getElementById('oto-edit-id').value='';document.getElementById('oto-date').value=new Date().toISOString().split('T')[0];['oto-topics','oto-actions','oto-notes'].forEach(i=>document.getElementById(i).value='');document.getElementById('oto-fileurl').value='';document.getElementById('oto-mood').value='positive';const sel=document.getElementById('oto-with');sel.innerHTML='<option value="">Select person...</option>';S.users.filter(u=>u.id!==S.currentUser.id).forEach(u=>{sel.innerHTML+=`<option value="${u.id}">${u.name} (${u.role})</option>`;});document.getElementById('modal-oto').classList.add('open');}
 function saveOto(){const date=document.getElementById('oto-date').value;const withId=document.getElementById('oto-with').value;if(!date||!withId){alert('Date and person required.');return;}S.onetoones.push({id:'oto'+Date.now(),userId:S.currentUser.id,withId,date,mood:document.getElementById('oto-mood').value,topics:document.getElementById('oto-topics').value.trim(),actions:document.getElementById('oto-actions').value.trim(),notes:document.getElementById('oto-notes').value.trim(),fileUrl:document.getElementById('oto-fileurl').value.trim()});save();closeModal('modal-oto');renderOneToOnes();}
 function deleteOto(id){if(!confirm('Delete this 1:1?'))return;S.onetoones=S.onetoones.filter(o=>o.id!==id);save();renderOneToOnes();}
+
+// ══════════════════════════════════════════════════════════
+// MY DOCS
+// ══════════════════════════════════════════════════════════
+let _docPendingFile=null;
+
+function renderMyDocs(){
+  const u=S.currentUser;if(!u)return;
+  const isAdmin=S.adminUnlocked;
+  // Staff see their own non-adminOnly docs; admins see all their own docs
+  const myDocs=S.docs.filter(d=>d.userId===u.id&&(isAdmin||!d.adminOnly)).sort((a,b)=>(b.date||b.uploadedAt||'').localeCompare(a.date||a.uploadedAt||''));
+  const activeType=window._docTypeFilter||'all';
+  const searchVal=(window._docSearch||'').toLowerCase();
+  let filtered=myDocs;
+  if(activeType!=='all')filtered=filtered.filter(d=>d.type===activeType);
+  if(searchVal)filtered=filtered.filter(d=>(d.title+' '+(d.description||'')).toLowerCase().includes(searchVal));
+
+  const typeCounts={};myDocs.forEach(d=>{typeCounts[d.type]=(typeCounts[d.type]||0)+1;});
+  const typeFilters=[{key:'all',label:'All',count:myDocs.length},...Object.keys(DOC_TYPES).filter(k=>typeCounts[k]).map(k=>({key:k,label:DOC_TYPES[k].label,count:typeCounts[k]}))];
+
+  document.getElementById('view-mydocs').innerHTML=`
+    <div class="page-title">My Docs</div>
+    <div class="page-sub">Your important documents and files</div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary" onclick="openDocModal()">+ Add Document</button>
+      <input class="form-input" style="max-width:220px;margin-bottom:0" placeholder="Search…" value="${esc(window._docSearch||'')}" oninput="window._docSearch=this.value;renderMyDocs()"/>
+      <span class="badge badge-green ml-auto" style="align-self:center">${myDocs.length} document${myDocs.length!==1?'s':''}</span>
+    </div>
+    ${typeFilters.length>1?`<div class="tabs" style="margin-bottom:20px;flex-wrap:wrap">
+      ${typeFilters.map(f=>`<div class="tab ${f.key===activeType?'active':''}" onclick="window._docTypeFilter='${f.key}';renderMyDocs()">${f.label} <span style="font-size:.7rem;opacity:.7">${f.count}</span></div>`).join('')}
+    </div>`:''}
+    ${filtered.length?`<div style="display:flex;flex-direction:column;gap:12px">
+      ${filtered.map(d=>{
+        const dt=DOC_TYPES[d.type]||DOC_TYPES.other;
+        const hasFile=!!d.fileData;
+        const hasUrl=!!d.url;
+        return`<div class="card" style="padding:14px 16px">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="font-size:1.6rem;flex-shrink:0;margin-top:2px">${dt.icon}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+                <span style="font-weight:700;font-size:.9rem;color:var(--wood)">${esc(d.title)}</span>
+                <span class="badge badge-navy" style="font-size:.68rem">${dt.label}</span>
+                ${d.adminOnly?'<span class="badge badge-amber" style="font-size:.65rem">Admin only</span>':''}
+              </div>
+              ${d.description?`<div style="font-size:.78rem;color:var(--muted);margin-bottom:4px">${esc(d.description)}</div>`:''}
+              <div style="font-size:.72rem;color:var(--muted)">
+                ${d.date?`📅 ${fmtDate(d.date)} · `:''}
+                Added ${fmtDate(d.uploadedAt)} by ${esc(d.uploadedBy||'Admin')}
+                ${hasFile?` · 📎 ${esc(d.fileName)} (${esc(d.fileSize)})`:''}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+              ${hasUrl?`<a href="${d.url}" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-decoration:none">🔗 Open</a>`:''}
+              ${hasFile?`<button class="btn btn-secondary btn-sm" onclick="downloadDoc('${d.id}')">⬇ Download</button>`:''}
+              ${isAdmin?`<button class="btn btn-secondary btn-sm" onclick="openDocModal('${d.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')">✕</button>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`:`<div class="empty-state"><div class="empty-icon">📁</div><p>${activeType!=='all'||searchVal?'No documents match your filter.':'No documents yet.'}</p>${!activeType||activeType==='all'?`<br><button class="btn btn-primary" onclick="openDocModal()">+ Add First Document</button>`:''}</div>`}
+  `;
+}
+
+function openDocModal(editId){
+  _docPendingFile=null;
+  document.getElementById('doc-modal-title').textContent=editId?'Edit Document':'Add Document';
+  document.getElementById('doc-edit-id').value=editId||'';
+  document.getElementById('doc-file-data').value='';
+  document.getElementById('doc-file-name').value='';
+  document.getElementById('doc-file-size').value='';
+  document.getElementById('doc-upload-text').textContent='Click to choose file, or drag here';
+  // Admin-only toggle — show only for admins
+  document.getElementById('doc-adminonly-group').style.display=S.adminUnlocked?'':'none';
+  // "For user" selector — show only for admins adding a new doc
+  const forGroup=document.getElementById('doc-for-group');
+  if(S.adminUnlocked&&!editId){
+    forGroup.style.display='';
+    const sel=document.getElementById('doc-for-user');
+    sel.innerHTML=S.users.map(u=>`<option value="${u.id}" ${u.id===S.currentUser.id?'selected':''}>${u.name} (${u.role})</option>`).join('');
+  }else{forGroup.style.display='none';}
+  if(editId){
+    const d=S.docs.find(x=>x.id===editId);if(!d)return;
+    document.getElementById('doc-title').value=d.title||'';
+    document.getElementById('doc-type').value=d.type||'';
+    document.getElementById('doc-date').value=d.date||'';
+    document.getElementById('doc-description').value=d.description||'';
+    document.getElementById('doc-url').value=d.url||'';
+    document.getElementById('doc-admin-only').checked=!!d.adminOnly;
+    if(d.fileName)document.getElementById('doc-upload-text').textContent=d.fileName+' ('+d.fileSize+') — already uploaded';
+  }else{
+    ['doc-title','doc-description','doc-url'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('doc-type').value='';
+    document.getElementById('doc-date').value='';
+    document.getElementById('doc-admin-only').checked=false;
+  }
+  document.getElementById('modal-doc').classList.add('open');
+}
+
+function handleDocFile(e){
+  const file=e.target.files[0];if(!file)return;
+  if(file.size>1048576){alert('File too large — maximum 1MB. For larger files, please use a SharePoint/OneDrive link instead.');e.target.value='';return;}
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    _docPendingFile={data:ev.target.result,name:file.name,size:fmtSize(file.size)};
+    document.getElementById('doc-upload-text').textContent=file.name+' ('+fmtSize(file.size)+') — ready to upload';
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveDoc(){
+  const title=document.getElementById('doc-title').value.trim();
+  const type=document.getElementById('doc-type').value;
+  if(!title||!type){alert('Title and type are required.');return;}
+  const editId=document.getElementById('doc-edit-id').value;
+  const existing=editId?S.docs.find(d=>d.id===editId):null;
+  const userId=S.adminUnlocked&&!editId?document.getElementById('doc-for-user').value:existing?existing.userId:S.currentUser.id;
+  const today=new Date().toISOString().split('T')[0];
+  const doc={
+    id:editId||'doc'+Date.now(),
+    userId,
+    title,
+    type,
+    date:document.getElementById('doc-date').value,
+    description:document.getElementById('doc-description').value.trim(),
+    url:document.getElementById('doc-url').value.trim(),
+    fileData:_docPendingFile?_docPendingFile.data:(existing?existing.fileData:null),
+    fileName:_docPendingFile?_docPendingFile.name:(existing?existing.fileName:''),
+    fileSize:_docPendingFile?_docPendingFile.size:(existing?existing.fileSize:''),
+    uploadedBy:S.currentUser?S.currentUser.name:'Admin',
+    uploadedAt:existing?existing.uploadedAt:today,
+    adminOnly:S.adminUnlocked?document.getElementById('doc-admin-only').checked:false,
+  };
+  if(editId){const i=S.docs.findIndex(d=>d.id===editId);if(i>=0)S.docs[i]=doc;else S.docs.push(doc);}
+  else S.docs.push(doc);
+  save();closeModal('modal-doc');renderMyDocs();
+}
+
+function deleteDoc(id){
+  if(!confirm('Delete this document?'))return;
+  S.docs=S.docs.filter(d=>d.id!==id);
+  save();renderMyDocs();
+}
+
+function downloadDoc(id){
+  const d=S.docs.find(x=>x.id===id);if(!d||!d.fileData)return;
+  const a=document.createElement('a');a.href=d.fileData;a.download=d.fileName||'document';a.click();
+}
+
+function renderAdminUserDocs(userId, containerEl){
+  const userDocs=S.docs.filter(d=>d.userId===userId).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  containerEl.innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <h4 style="font-size:.85rem;font-weight:700;color:var(--wood);flex:1">Documents (${userDocs.length})</h4>
+      <button class="btn btn-primary btn-sm" onclick="openDocModalForUser('${userId}')">+ Add Doc</button>
+    </div>
+    ${userDocs.length?userDocs.map(d=>{
+      const dt=DOC_TYPES[d.type]||DOC_TYPES.other;
+      return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:1.1rem">${dt.icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.title)}</div>
+          <div style="font-size:.7rem;color:var(--muted)">${dt.label}${d.date?' · '+fmtDate(d.date):''}${d.adminOnly?' · Admin only':''}</div>
+        </div>
+        ${d.url?`<a href="${d.url}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none;flex-shrink:0">🔗</a>`:''}
+        ${d.fileData?`<button class="btn btn-secondary btn-sm" onclick="downloadDoc('${d.id}')" style="flex-shrink:0">⬇</button>`:''}
+        <button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="deleteDoc('${d.id}');renderAdminUserDocs('${userId}',this.closest('.admin-doc-panel'))">✕</button>
+      </div>`;
+    }).join(''):`<div style="font-size:.78rem;color:var(--muted);padding:8px 0">No documents yet.</div>`}
+  `;
+}
+
+function openDocModalForUser(userId){
+  openDocModal();
+  // Pre-select the user
+  setTimeout(()=>{
+    const sel=document.getElementById('doc-for-user');
+    if(sel)sel.value=userId;
+  },50);
+}
 
 // ══════════════════════════════════════════════════════════
 // EXPERTS
