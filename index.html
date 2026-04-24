@@ -1530,6 +1530,18 @@ function renderReviews(){
 function openReviewModal(){document.getElementById('review-modal-title').textContent='New Performance Review';document.getElementById('rev-edit-id').value='';['rev-strengths','rev-improvements','rev-nextgoals','rev-comments'].forEach(i=>document.getElementById(i).value='');['rev-s-technical','rev-s-communication','rev-s-teamwork','rev-s-leadership','rev-s-initiative','rev-s-overall'].forEach(i=>document.getElementById(i).value='');const sel=document.getElementById('rev-reviewer');sel.innerHTML='<option value="">Select reviewer...</option>';S.users.forEach(u=>{sel.innerHTML+=`<option value="${u.id}">${u.name} (${u.role})</option>`;});document.getElementById('modal-review').classList.add('open');}
 function saveReview(){const scores={technical:parseInt(document.getElementById('rev-s-technical').value)||0,communication:parseInt(document.getElementById('rev-s-communication').value)||0,teamwork:parseInt(document.getElementById('rev-s-teamwork').value)||0,leadership:parseInt(document.getElementById('rev-s-leadership').value)||0,initiative:parseInt(document.getElementById('rev-s-initiative').value)||0,overall:parseInt(document.getElementById('rev-s-overall').value)||0};S.reviews.push({id:'r'+Date.now(),userId:S.currentUser.id,period:document.getElementById('rev-period').value,type:document.getElementById('rev-type').value,reviewerId:document.getElementById('rev-reviewer').value,date:new Date().toISOString().split('T')[0],scores,strengths:document.getElementById('rev-strengths').value.trim(),improvements:document.getElementById('rev-improvements').value.trim(),nextGoals:document.getElementById('rev-nextgoals').value.trim(),comments:document.getElementById('rev-comments').value.trim()});save();closeModal('modal-review');renderReviews();}
 function deleteReview(id){if(!confirm('Delete this review?'))return;S.reviews=S.reviews.filter(r=>r.id!==id);save();renderReviews();}
+function openReviewRequestModal(){alert('6-monthly review scheduling is coming soon. Please contact your manager directly to arrange your next review.');}
+
+// ══════════════════════════════════════════════════════════
+// DISCLOSURES (stub — feature coming soon)
+// ══════════════════════════════════════════════════════════
+function renderDisclosures(){
+  document.getElementById('view-disclosures').innerHTML=`
+    <div class="page-title">Raise a Concern</div>
+    <div class="page-sub">Confidential reporting — coming soon</div>
+    <div class="empty-state"><div class="empty-icon">🔒</div><p>This feature is being set up.<br>In the meantime, please speak directly with your manager or director.</p></div>
+  `;
+}
 
 // ══════════════════════════════════════════════════════════
 // ONE-TO-ONES
