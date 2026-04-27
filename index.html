@@ -878,14 +878,10 @@ Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen
       <textarea class="form-input" id="doc-description" rows="2" placeholder="Brief description…" style="resize:vertical"></textarea>
     </div>
     <div class="form-group">
-      <label class="form-label">Link (SharePoint, OneDrive, etc.)</label>
-      <input class="form-input" id="doc-url" type="url" placeholder="https://…"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Or upload a file <span style="color:var(--muted);font-size:.72rem">(max 1MB)</span></label>
-      <div class="upload-zone" id="doc-upload-zone" onclick="document.getElementById('doc-file').click()" style="padding:16px;text-align:center;cursor:pointer">
-        <div id="doc-upload-text" style="font-size:.8rem;color:var(--muted)">Click to choose file, or drag here</div>
-        <input type="file" id="doc-file" style="display:none" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onchange="handleDocFile(event)"/>
+      <label class="form-label">SharePoint / OneDrive Link *</label>
+      <input class="form-input" id="doc-url" type="url" placeholder="https://mckenzieco.sharepoint.com/…"/>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:4px">
+        In SharePoint: open the file → Share → Copy link. Set permissions to "People in your organisation".
       </div>
     </div>
     <div class="form-group" id="doc-adminonly-group" style="display:none">
@@ -895,9 +891,6 @@ Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen
       </label>
     </div>
     <input type="hidden" id="doc-edit-id"/>
-    <input type="hidden" id="doc-file-data"/>
-    <input type="hidden" id="doc-file-name"/>
-    <input type="hidden" id="doc-file-size"/>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-doc')">Cancel</button>
       <button class="btn btn-primary" onclick="saveDoc()">Save</button>
@@ -1743,8 +1736,6 @@ function deleteOto(id){if(!confirm('Delete this 1:1?'))return;S.onetoones=S.onet
 // ══════════════════════════════════════════════════════════
 // MY DOCS
 // ══════════════════════════════════════════════════════════
-let _docPendingFile=null;
-
 function renderMyDocs(){
   const u=S.currentUser;if(!u)return;
   const isAdmin=S.adminUnlocked;
@@ -1773,8 +1764,6 @@ function renderMyDocs(){
     ${filtered.length?`<div style="display:flex;flex-direction:column;gap:12px">
       ${filtered.map(d=>{
         const dt=DOC_TYPES[d.type]||DOC_TYPES.other;
-        const hasFile=!!d.fileData;
-        const hasUrl=!!d.url;
         return`<div class="card" style="padding:14px 16px">
           <div style="display:flex;align-items:flex-start;gap:12px">
             <div style="font-size:1.6rem;flex-shrink:0;margin-top:2px">${dt.icon}</div>
@@ -1787,12 +1776,10 @@ function renderMyDocs(){
               ${d.description?`<div style="font-size:.78rem;color:var(--muted);margin-bottom:4px">${esc(d.description)}</div>`:''}
               <div style="font-size:.72rem;color:var(--muted)">
                 ${d.date?`📅 ${fmtDate(d.date)} · `:''}
-                Added ${fmtDate(d.uploadedAt)} by ${esc(d.uploadedBy||'Admin')}
-                ${hasFile?` · 📎 ${esc(d.fileName)} (${esc(d.fileSize)})`:''}</div>
+                Added ${fmtDate(d.uploadedAt)} by ${esc(d.uploadedBy||'Admin')}</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-              ${hasUrl?`<a href="${d.url}" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-decoration:none">🔗 Open</a>`:''}
-              ${hasFile?`<button class="btn btn-secondary btn-sm" onclick="downloadDoc('${d.id}')">⬇ Download</button>`:''}
+              ${d.url?`<a href="${d.url}" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-decoration:none">🔗 Open</a>`:''}
               ${isAdmin?`<button class="btn btn-secondary btn-sm" onclick="openDocModal('${d.id}')">Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')">✕</button>`:''}
             </div>
@@ -1804,13 +1791,8 @@ function renderMyDocs(){
 }
 
 function openDocModal(editId){
-  _docPendingFile=null;
   document.getElementById('doc-modal-title').textContent=editId?'Edit Document':'Add Document';
   document.getElementById('doc-edit-id').value=editId||'';
-  document.getElementById('doc-file-data').value='';
-  document.getElementById('doc-file-name').value='';
-  document.getElementById('doc-file-size').value='';
-  document.getElementById('doc-upload-text').textContent='Click to choose file, or drag here';
   // Admin-only toggle — show only for admins
   document.getElementById('doc-adminonly-group').style.display=S.adminUnlocked?'':'none';
   // "For user" selector — show only for admins adding a new doc
@@ -1828,7 +1810,6 @@ function openDocModal(editId){
     document.getElementById('doc-description').value=d.description||'';
     document.getElementById('doc-url').value=d.url||'';
     document.getElementById('doc-admin-only').checked=!!d.adminOnly;
-    if(d.fileName)document.getElementById('doc-upload-text').textContent=d.fileName+' ('+d.fileSize+') — already uploaded';
   }else{
     ['doc-title','doc-description','doc-url'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('doc-type').value='';
@@ -1836,17 +1817,6 @@ function openDocModal(editId){
     document.getElementById('doc-admin-only').checked=false;
   }
   document.getElementById('modal-doc').classList.add('open');
-}
-
-function handleDocFile(e){
-  const file=e.target.files[0];if(!file)return;
-  if(file.size>1048576){alert('File too large — maximum 1MB. For larger files, please use a SharePoint/OneDrive link instead.');e.target.value='';return;}
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    _docPendingFile={data:ev.target.result,name:file.name,size:fmtSize(file.size)};
-    document.getElementById('doc-upload-text').textContent=file.name+' ('+fmtSize(file.size)+') — ready to upload';
-  };
-  reader.readAsDataURL(file);
 }
 
 function saveDoc(){
@@ -1865,9 +1835,6 @@ function saveDoc(){
     date:document.getElementById('doc-date').value,
     description:document.getElementById('doc-description').value.trim(),
     url:document.getElementById('doc-url').value.trim(),
-    fileData:_docPendingFile?_docPendingFile.data:(existing?existing.fileData:null),
-    fileName:_docPendingFile?_docPendingFile.name:(existing?existing.fileName:''),
-    fileSize:_docPendingFile?_docPendingFile.size:(existing?existing.fileSize:''),
     uploadedBy:S.currentUser?S.currentUser.name:'Admin',
     uploadedAt:existing?existing.uploadedAt:today,
     adminOnly:S.adminUnlocked?document.getElementById('doc-admin-only').checked:false,
@@ -1881,11 +1848,6 @@ function deleteDoc(id){
   if(!confirm('Delete this document?'))return;
   S.docs=S.docs.filter(d=>d.id!==id);
   save();renderMyDocs();
-}
-
-function downloadDoc(id){
-  const d=S.docs.find(x=>x.id===id);if(!d||!d.fileData)return;
-  const a=document.createElement('a');a.href=d.fileData;a.download=d.fileName||'document';a.click();
 }
 
 function renderAdminUserDocs(userId, containerEl){
@@ -1904,7 +1866,6 @@ function renderAdminUserDocs(userId, containerEl){
           <div style="font-size:.7rem;color:var(--muted)">${dt.label}${d.date?' · '+fmtDate(d.date):''}${d.adminOnly?' · Admin only':''}</div>
         </div>
         ${d.url?`<a href="${d.url}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none;flex-shrink:0">🔗</a>`:''}
-        ${d.fileData?`<button class="btn btn-secondary btn-sm" onclick="downloadDoc('${d.id}')" style="flex-shrink:0">⬇</button>`:''}
         <button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="deleteDoc('${d.id}');renderAdminUserDocs('${userId}',this.closest('.admin-doc-panel'))">✕</button>
       </div>`;
     }).join(''):`<div style="font-size:.78rem;color:var(--muted);padding:8px 0">No documents yet.</div>`}
