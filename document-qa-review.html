@@ -1659,8 +1659,9 @@ async function callBackendReview(opts){
     }),
   });
   if(!resp.ok){
+    const text = await resp.text();
     let msg;
-    try { const j = await resp.json(); msg = j.error || JSON.stringify(j); } catch { msg = await resp.text(); }
+    try { const j = JSON.parse(text); msg = j.error || JSON.stringify(j); } catch { msg = text || '(empty body)'; }
     throw new Error(`Backend returned ${resp.status}: ${msg}`);
   }
   const data = await resp.json();
@@ -2762,8 +2763,10 @@ async function testConnection(){
   r.className='test-status info';r.style.display='block';r.textContent='Running diagnostic (raw HTTPS + SDK) from inside Azure…';
   try {
     const resp = await fetch(qaApiUrl('qaPing'), { method: 'POST' });
+    // Read once as text — fetch body streams can only be read once.
+    const text = await resp.text();
     let j;
-    try { j = await resp.json(); } catch { j = { error: await resp.text() }; }
+    try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text || '(empty body)' }; }
 
     if(resp.status === 404){
       r.className='test-status err';
