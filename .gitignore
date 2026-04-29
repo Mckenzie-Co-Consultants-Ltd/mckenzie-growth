@@ -4,3 +4,5 @@ api/node_modules/
 *.log
 ".claude/" 
 "logo_b64.txt" 
+".claude/" 
+"logo_b64.txt" 
