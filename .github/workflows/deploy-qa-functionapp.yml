@@ -9,8 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  # ⚠️ UPDATE THIS to your Function App name (the bit before .azurewebsites.net).
-  AZURE_FUNCTIONAPP_NAME: 'CHANGE-ME-mck-qa-api'
+  AZURE_FUNCTIONAPP_NAME: 'mck-qa-api'
   AZURE_FUNCTIONAPP_PACKAGE_PATH: './functionapp'
   NODE_VERSION: '20.x'
 
