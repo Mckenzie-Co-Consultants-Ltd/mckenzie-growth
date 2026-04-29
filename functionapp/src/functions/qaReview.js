@@ -1,13 +1,14 @@
 /**
  * /api/qaReview — runs an AI QA review on an uploaded document via Claude.
  *
- * Uses ONLY Node's built-in https module — no @anthropic-ai/sdk or mammoth
- * dependency, so deployment doesn't depend on node_modules being present.
- *
+ * Uses ONLY Node's built-in https module (no @anthropic-ai/sdk dependency).
  * Supported file types: PDF (sent natively as document block), plain text
- * (.txt, .md, .csv). DOCX is not supported in this build — convert to PDF.
+ * (.txt, .md, .csv). DOCX not supported in this build — convert to PDF.
+ *
+ * V4 programming model.
  */
 
+const { app } = require('@azure/functions');
 const https = require('https');
 
 // ---------- Constants ----------
@@ -158,8 +159,6 @@ ${checksList}
   return blocks;
 }
 
-/* Raw HTTPS POST to Anthropic /v1/messages.
-   Resolves with parsed JSON on 2xx, rejects with Error (status/requestId/body) on non-2xx. */
 function callAnthropic(apiKey, payload) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(payload);
@@ -173,7 +172,7 @@ function callAnthropic(apiKey, payload) {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
       },
-      timeout: 290000,   // just under Function App's 5-min timeout
+      timeout: 290000,
     }, (res) => {
       let chunks = '';
       res.on('data', c => { chunks += c; });
@@ -201,118 +200,122 @@ function callAnthropic(apiKey, payload) {
 
 // ---------- Handler ----------
 
-module.exports = async function (context, req) {
-  try {
-    const apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
-    if (!apiKey) {
-      context.res = { status: 503, headers: { 'Content-Type': 'application/json' }, body: { error: 'ANTHROPIC_API_KEY is not configured on the server.' } };
-      return;
-    }
-    if (!apiKey.startsWith('sk-ant-')) {
-      context.res = { status: 502, headers: { 'Content-Type': 'application/json' }, body: { error: 'ANTHROPIC_API_KEY value is not a valid Anthropic key.' } };
-      return;
-    }
-
-    const body = req.body;
-    if (!body || typeof body !== 'object') throw badRequest('Request body must be JSON');
-
-    const {
-      fileBase64, fileName, mimeType,
-      projectNumber, projectName, purpose, context: docContext, checks,
-      reviewer, version, systemPrompt, checkPrompts,
-      model: requestedModel, maxTokens: requestedMaxTokens,
-    } = body;
-
-    if (!fileBase64) throw badRequest('fileBase64 is required');
-    if (!purpose) throw badRequest('purpose is required');
-    if (!Array.isArray(checks) || !checks.length) throw badRequest('checks must be a non-empty array');
-
-    const validChecks = checks.filter(c => CHECK_IDS.includes(c));
-    if (!validChecks.length) throw badRequest('No valid checks supplied. Allowed: ' + CHECK_IDS.join(', '));
-
-    const model = ALLOWED_MODELS.has(requestedModel) ? requestedModel : 'claude-opus-4-7';
-    const maxTokens = Math.min(Math.max(parseInt(requestedMaxTokens) || 16000, 1024), MAX_TOKENS_CAP);
-
-    const extracted = extractDocument(fileName, mimeType, fileBase64);
-
-    const checksList = validChecks.map(id => {
-      const c = QA_CHECKS[id];
-      const extra = checkPrompts && checkPrompts[id] ? '\n  Additional guidance: ' + checkPrompts[id] : '';
-      return `- ${c.title}: ${c.desc}${extra}`;
-    }).join('\n');
-
-    const renderedSystem = fillTemplate(
-      systemPrompt && systemPrompt.trim() ? systemPrompt : DEFAULT_SYSTEM_PROMPT,
-      {
-        filename: fileName || 'untitled',
-        purpose,
-        projectNumber: projectNumber || 'unspecified',
-        projectName: projectName || '',
-        context: docContext || 'none provided',
-        checks: checksList,
-        version: version || 1,
-      }
-    );
-
-    const userContent = buildUserContent(
-      extracted,
-      { fileName, purpose, projectNumber, projectName, version, context: docContext },
-      checksList
-    );
-
-    const payload = {
-      model,
-      max_tokens: maxTokens,
-      thinking: { type: 'adaptive' },
-      output_config: {
-        effort: 'high',
-        format: { type: 'json_schema', schema: REVIEW_SCHEMA },
-      },
-      cache_control: { type: 'ephemeral' },
-      system: renderedSystem,
-      messages: [{ role: 'user', content: userContent }],
-    };
-
-    const result = await callAnthropic(apiKey, payload);
-    const message = result.data;
-
-    const textBlock = (message.content || []).find(b => b.type === 'text');
-    if (!textBlock || !textBlock.text) {
-      throw new Error('Claude returned no text content (stop_reason: ' + message.stop_reason + ')');
-    }
-
-    let parsed;
+app.http('qaReview', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  handler: async (request, context) => {
     try {
-      parsed = JSON.parse(textBlock.text);
-    } catch (e) {
-      throw new Error('Claude response was not valid JSON: ' + e.message + '. First 500 chars: ' + textBlock.text.slice(0, 500));
+      const apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
+      if (!apiKey) {
+        return { status: 503, jsonBody: { error: 'ANTHROPIC_API_KEY is not configured on the server.' } };
+      }
+      if (!apiKey.startsWith('sk-ant-')) {
+        return { status: 502, jsonBody: { error: 'ANTHROPIC_API_KEY value is not a valid Anthropic key.' } };
+      }
+
+      let body;
+      try {
+        body = await request.json();
+      } catch (e) {
+        throw badRequest('Request body must be valid JSON: ' + e.message);
+      }
+      if (!body || typeof body !== 'object') throw badRequest('Request body must be JSON');
+
+      const {
+        fileBase64, fileName, mimeType,
+        projectNumber, projectName, purpose, context: docContext, checks,
+        reviewer, version, systemPrompt, checkPrompts,
+        model: requestedModel, maxTokens: requestedMaxTokens,
+      } = body;
+
+      if (!fileBase64) throw badRequest('fileBase64 is required');
+      if (!purpose) throw badRequest('purpose is required');
+      if (!Array.isArray(checks) || !checks.length) throw badRequest('checks must be a non-empty array');
+
+      const validChecks = checks.filter(c => CHECK_IDS.includes(c));
+      if (!validChecks.length) throw badRequest('No valid checks supplied. Allowed: ' + CHECK_IDS.join(', '));
+
+      const model = ALLOWED_MODELS.has(requestedModel) ? requestedModel : 'claude-opus-4-7';
+      const maxTokens = Math.min(Math.max(parseInt(requestedMaxTokens) || 16000, 1024), MAX_TOKENS_CAP);
+
+      const extracted = extractDocument(fileName, mimeType, fileBase64);
+
+      const checksList = validChecks.map(id => {
+        const c = QA_CHECKS[id];
+        const extra = checkPrompts && checkPrompts[id] ? '\n  Additional guidance: ' + checkPrompts[id] : '';
+        return `- ${c.title}: ${c.desc}${extra}`;
+      }).join('\n');
+
+      const renderedSystem = fillTemplate(
+        systemPrompt && systemPrompt.trim() ? systemPrompt : DEFAULT_SYSTEM_PROMPT,
+        {
+          filename: fileName || 'untitled',
+          purpose,
+          projectNumber: projectNumber || 'unspecified',
+          projectName: projectName || '',
+          context: docContext || 'none provided',
+          checks: checksList,
+          version: version || 1,
+        }
+      );
+
+      const userContent = buildUserContent(
+        extracted,
+        { fileName, purpose, projectNumber, projectName, version, context: docContext },
+        checksList
+      );
+
+      const payload = {
+        model,
+        max_tokens: maxTokens,
+        thinking: { type: 'adaptive' },
+        output_config: {
+          effort: 'high',
+          format: { type: 'json_schema', schema: REVIEW_SCHEMA },
+        },
+        cache_control: { type: 'ephemeral' },
+        system: renderedSystem,
+        messages: [{ role: 'user', content: userContent }],
+      };
+
+      const result = await callAnthropic(apiKey, payload);
+      const message = result.data;
+
+      const textBlock = (message.content || []).find(b => b.type === 'text');
+      if (!textBlock || !textBlock.text) {
+        throw new Error('Claude returned no text content (stop_reason: ' + message.stop_reason + ')');
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(textBlock.text);
+      } catch (e) {
+        throw new Error('Claude response was not valid JSON: ' + e.message + '. First 500 chars: ' + textBlock.text.slice(0, 500));
+      }
+
+      return {
+        status: 200,
+        jsonBody: {
+          ...parsed,
+          model: message.model,
+          usage: message.usage,
+          stop_reason: message.stop_reason,
+          requestId: result.requestId,
+        },
+      };
+    } catch (err) {
+      const detail = {
+        error: err.message || 'Unknown error',
+        errorClass: err && err.constructor ? err.constructor.name : typeof err,
+        status: err.status,
+        requestId: err.requestId,
+        anthropicError: err.body && err.body.error ? err.body.error : undefined,
+      };
+      context.error('qaReview error:', JSON.stringify(detail), err.stack);
+      return {
+        status: err.status || 500,
+        jsonBody: detail,
+      };
     }
-
-    context.res = {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: {
-        ...parsed,
-        model: message.model,
-        usage: message.usage,
-        stop_reason: message.stop_reason,
-        requestId: result.requestId,
-      },
-    };
-  } catch (err) {
-    const detail = {
-      error: err.message || 'Unknown error',
-      errorClass: err && err.constructor ? err.constructor.name : typeof err,
-      status: err.status,
-      requestId: err.requestId,
-      anthropicError: err.body && err.body.error ? err.body.error : undefined,
-    };
-    context.log.error('qaReview error:', JSON.stringify(detail), err.stack);
-
-    context.res = {
-      status: err.status || 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: detail,
-    };
-  }
-};
+  },
+});

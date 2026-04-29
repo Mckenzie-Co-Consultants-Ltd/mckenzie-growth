@@ -1,7 +1,9 @@
 {
   "name": "mckenzie-qa-functionapp",
   "version": "1.0.0",
-  "description": "Dedicated Azure Function App for QA review endpoints. Uses Node built-in https module only — no npm dependencies, so deploys cleanly without node_modules concerns.",
-  "main": "index.js",
-  "dependencies": {}
+  "description": "Dedicated Azure Function App for QA review endpoints. Uses Azure Functions Node.js V4 programming model.",
+  "main": "src/functions/*.js",
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  }
 }
