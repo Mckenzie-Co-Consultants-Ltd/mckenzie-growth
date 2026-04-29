@@ -849,13 +849,22 @@ const DEFAULT_CHECK_PROMPTS = {
 };
 
 const DEFAULT_CONFIG = {
-  mockMode:false,                      // false = call /api/qaReview; true = client-side simulation
+  mockMode:false,                      // false = call backend; true = client-side simulation
+  qaApiBase:'',                        // empty = same-origin /api (SWA managed); else full origin like https://mck-qa-api.azurewebsites.net
   model:'claude-opus-4-7',
   maxTokens:16000,
   systemPrompt:DEFAULT_SYSTEM_PROMPT,
   checkPrompts:{...DEFAULT_CHECK_PROMPTS},
   adminPasswordHash:''
 };
+
+/* Build the full URL for a QA endpoint. If CONFIG.qaApiBase is set, hits the
+   dedicated Function App; otherwise falls back to SWA managed Functions
+   at /api on the current origin. */
+function qaApiUrl(name){
+  const base = (CONFIG.qaApiBase || '').replace(/\/+$/, '');
+  return base ? `${base}/api/${name}` : `/api/${name}`;
+}
 
 function loadConfig(){
   try{
@@ -1635,7 +1644,7 @@ async function callBackendReview(opts){
   const meta = fileMeta || { name: file.name, size: file.size, type: file.type };
   const fileBase64 = await fileToBase64(file);
 
-  const resp = await fetch('/api/qaReview', {
+  const resp = await fetch(qaApiUrl('qaReview'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -2585,7 +2594,13 @@ function adminPanelHtml(){
     <!-- AI PROVIDER -->
     <div class="admin-section">
       <h3>🤖 AI Provider</h3>
-      <p class="sec-sub">Reviews are processed by Claude via the backend at <code>/api/qaReview</code>. The Anthropic API key is set server-side as the <code>ANTHROPIC_API_KEY</code> environment variable in Azure SWA → Configuration — never in the browser.</p>
+      <p class="sec-sub">Reviews are processed by Claude via the configured backend. The Anthropic API key lives server-side as the <code>ANTHROPIC_API_KEY</code> environment variable — never in the browser.</p>
+
+      <div class="field" style="margin-bottom:12px">
+        <label>QA API base URL</label>
+        <input type="text" id="cfgQaApiBase" placeholder="(blank = same-origin /api on this SWA)" value="${escapeHtml(CONFIG.qaApiBase||'')}" autocomplete="off"/>
+        <div class="hint">Leave blank to call SWA's managed Functions at <code>/api</code>. For a dedicated Function App, paste the origin (e.g. <code>https://mck-qa-api.azurewebsites.net</code>). Don't include <code>/api</code>.</div>
+      </div>
 
       <div class="field">
         <label>Backend status</label>
@@ -2718,6 +2733,7 @@ function resetCheckPrompts(){
 function saveAdminSettings(){
   const newCfg = {
     mockMode: document.getElementById('cfgMockMode').checked,
+    qaApiBase: (document.getElementById('cfgQaApiBase').value||'').trim().replace(/\/+$/,''),
     model: document.getElementById('cfgModel').value,
     maxTokens: Math.min(Math.max(parseInt(document.getElementById('cfgMaxTokens').value)||16000, 1024), 32000),
     systemPrompt: document.getElementById('cfgSystemPrompt').value,
@@ -2745,7 +2761,7 @@ async function testConnection(){
   const r = document.getElementById('backendStatus');
   r.className='test-status info';r.style.display='block';r.textContent='Running diagnostic (raw HTTPS + SDK) from inside Azure…';
   try {
-    const resp = await fetch('/api/qaPing', { method: 'POST' });
+    const resp = await fetch(qaApiUrl('qaPing'), { method: 'POST' });
     let j;
     try { j = await resp.json(); } catch { j = { error: await resp.text() }; }
 

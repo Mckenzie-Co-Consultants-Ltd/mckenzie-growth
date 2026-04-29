@@ -1,0 +1,10 @@
+{
+  "name": "mckenzie-qa-functionapp",
+  "version": "1.0.0",
+  "description": "Dedicated Azure Function App for QA review endpoints (separated from SWA managed functions to use a dedicated egress IP that Anthropic accepts).",
+  "main": "index.js",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.88.0",
+    "mammoth": "^1.8.0"
+  }
+}

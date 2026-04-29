@@ -1,0 +1,40 @@
+name: Deploy QA Function App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functionapp/**'
+      - '.github/workflows/deploy-qa-functionapp.yml'
+  workflow_dispatch:
+
+env:
+  # ⚠️ UPDATE THIS to your Function App name (the bit before .azurewebsites.net).
+  AZURE_FUNCTIONAPP_NAME: 'CHANGE-ME-mck-qa-api'
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: './functionapp'
+  NODE_VERSION: '20.x'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install npm dependencies
+        run: |
+          pushd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          npm install --omit=dev
+          popd
+
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
