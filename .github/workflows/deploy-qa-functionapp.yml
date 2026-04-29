@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_NAME: 'mck-qa-api'
+  AZURE_FUNCTIONAPP_NAME: 'mckco-qa-review-2'
   AZURE_FUNCTIONAPP_PACKAGE_PATH: './functionapp'
   NODE_VERSION: '20.x'
 
