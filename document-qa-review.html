@@ -627,9 +627,12 @@ button.secondary:hover{border-color:var(--moss);color:var(--moss-dark)}
     <div class="row-between">
       <div>
         <h2 style="font-size:1rem;font-weight:800;color:var(--wood);letter-spacing:-0.01em">Project QA Register</h2>
-        <p style="font-size:.78rem;color:var(--muted);margin-top:2px">Every QA review logged against its project. Click a project to see its full QA history.</p>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px" id="projSub">Every QA review logged against its project. Click a project to see its full QA history.</p>
       </div>
-      <input type="text" id="projectSearch" placeholder="Search project number or name…" oninput="renderProjectRegister()" style="padding:7px 12px;border:1px solid var(--border);border-radius:6px;font-size:.78rem;font-family:inherit;min-width:260px;background:#fff"/>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="filter-pills" id="projScopeFilter"></div>
+        <input type="text" id="projectSearch" placeholder="Search project number or name…" oninput="renderProjectRegister()" style="padding:7px 12px;border:1px solid var(--border);border-radius:6px;font-size:.78rem;font-family:inherit;min-width:260px;background:#fff"/>
+      </div>
     </div>
     <div id="projectList" class="project-list"></div>
   </div>
@@ -669,9 +672,10 @@ button.secondary:hover{border-color:var(--moss);color:var(--moss-dark)}
       <div class="row-between">
         <div>
           <h2>Recent Reviews</h2>
-          <p class="sub">Latest QA reviews — click any row to reopen results</p>
+          <p class="sub" id="recentSub">Showing the most recent 10. Use scope/date filters to narrow.</p>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div class="filter-pills" id="recentScopeFilter"></div>
           <div class="filter-pills" id="recentDateFilter"></div>
           <button class="secondary" onclick="clearAllReviews()">Clear all reviews</button>
         </div>
@@ -691,6 +695,13 @@ button.secondary:hover{border-color:var(--moss);color:var(--moss-dark)}
         </thead>
         <tbody id="recentBody"></tbody>
       </table>
+      <div style="margin-top:10px;display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:.7rem;color:var(--muted)">
+        <span>Show:</span>
+        <span class="fp" onclick="setRecentRowLimit(10)" id="rrl-10">10</span>
+        <span class="fp" onclick="setRecentRowLimit(25)" id="rrl-25">25</span>
+        <span class="fp" onclick="setRecentRowLimit(50)" id="rrl-50">50</span>
+        <span class="fp" onclick="setRecentRowLimit(99999)" id="rrl-all">All</span>
+      </div>
     </div>
 
   </div>
@@ -788,11 +799,15 @@ const PURPOSE_TONE = {
   'Other':{bias:0,focus:[]}
 };
 
-const CURRENT_USER = 'Jimmy McKenzie';
+let CURRENT_USER = 'Jimmy McKenzie';        // overwritten on init from /.auth/me when available
+let CURRENT_USER_EMAIL = '';                  // populated when AAD is available
 
 /* ================== STATE ================== */
 let uploadedFile = null;
-let reviews = loadReviews();
+let reviews = loadReviews();   // local cache; replaced from Cosmos on init
+let reviewsScope = 'mine';     // 'mine' | 'all' — which slice of Cosmos data is currently loaded
+let reviewsTotal = 0;          // total count from server (for pagination UIs)
+let cosmosAvailable = false;   // set true once we successfully list reviews from server
 let issueFilter = 'all';
 let activeReview = null;
 let formMode = 'new';          // 'new' | 'version' | 'package'
@@ -803,8 +818,141 @@ let folderRoot = '';           // top-level folder name
 function loadReviews(){
   try{return JSON.parse(localStorage.getItem('mck-qa-reviews')||'[]');}catch{return [];}
 }
-function saveReviews(){
+function saveReviewsLocal(){
   localStorage.setItem('mck-qa-reviews',JSON.stringify(reviews));
+}
+
+/* Persist a single review to Cosmos via /api/saveQaReview.
+   Falls back to localStorage-only if the backend is unreachable. */
+async function persistReview(review){
+  saveReviewsLocal();   // always keep a local cache for offline / sub-second reload
+  if(!cosmosAvailable)return { ok:false, reason:'cosmos-unavailable' };
+  try{
+    const resp = await fetch('/api/saveQaReview', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(review),
+    });
+    if(!resp.ok){
+      const text = await resp.text();
+      console.warn('saveQaReview failed:', resp.status, text);
+      return { ok:false, status:resp.status, body:text };
+    }
+    return { ok:true };
+  }catch(err){
+    console.warn('saveQaReview network error:', err.message);
+    return { ok:false, error: err.message };
+  }
+}
+
+/* Fire-and-forget upsert all currently-cached reviews to Cosmos in parallel.
+   Used after bulk operations (status changes, mass edits). */
+async function persistReviews(items){
+  saveReviewsLocal();
+  if(!cosmosAvailable)return;
+  await Promise.allSettled(items.map(r => persistReview(r)));
+}
+
+/* Backwards-compat alias — code in many places calls saveReviews(). */
+function saveReviews(){
+  saveReviewsLocal();
+  // Best-effort cloud push of the active review only — full-set push happens via persistReviews()
+  if(activeReview && cosmosAvailable){
+    persistReview(activeReview);
+  }
+}
+
+/* Fetch reviews from Cosmos with the given scope. Returns the list and
+   updates reviewsTotal. Replaces local `reviews` cache. */
+async function loadReviewsFromCosmos(scope = 'mine', limit = 500, offset = 0){
+  const params = new URLSearchParams({ scope, limit:String(limit), offset:String(offset) });
+  if(scope === 'mine')params.set('reviewer', CURRENT_USER);
+  const resp = await fetch('/api/listQaReviews?'+params.toString());
+  if(!resp.ok){
+    const text = await resp.text();
+    throw new Error(`listQaReviews ${resp.status}: ${text}`);
+  }
+  const data = await resp.json();
+  reviews = data.reviews || [];
+  reviewsTotal = data.total || 0;
+  reviewsScope = data.scope || scope;
+  saveReviewsLocal();   // keep mirror in case server goes away
+  cosmosAvailable = true;
+  return data;
+}
+
+/* Switch the loaded scope (Mine vs All) and re-render. */
+async function setReviewsScope(scope){
+  if(scope === reviewsScope)return;
+  try{
+    await loadReviewsFromCosmos(scope);
+    // Re-render whichever view is active
+    const active = document.querySelector('.view.active');
+    if(active){
+      const id = active.id;
+      if(id === 'view-mydocs')renderMyDocs();
+      else if(id === 'view-projects')renderProjectRegister();
+      else if(id === 'view-reports')renderReports();
+    }
+  }catch(err){
+    alert('Failed to switch scope: '+err.message);
+  }
+}
+
+/* Detect the signed-in user via SWA's /.auth/me endpoint. Best-effort —
+   if AAD isn't configured (local dev), keeps the default CURRENT_USER. */
+async function detectCurrentUser(){
+  try{
+    const resp = await fetch('/.auth/me', { credentials:'same-origin' });
+    if(!resp.ok)return;
+    const data = await resp.json();
+    const principal = Array.isArray(data) ? data[0] : (data.clientPrincipal || null);
+    if(!principal)return;
+    const claims = principal.claims || principal.userClaims || [];
+    const nameClaim = claims.find(c => /\bname$/i.test(c.typ) || c.typ === 'name');
+    const emailClaim = claims.find(c => /(email|preferred_username|upn)$/i.test(c.typ));
+    if(nameClaim && nameClaim.val)CURRENT_USER = nameClaim.val;
+    else if(principal.userDetails)CURRENT_USER = principal.userDetails;
+    if(emailClaim && emailClaim.val)CURRENT_USER_EMAIL = emailClaim.val;
+  }catch(err){
+    // No AAD or network issue — fall back to default
+    console.log('detectCurrentUser: using default CURRENT_USER (', err.message, ')');
+  }
+}
+
+/* On first init: pull from Cosmos. If Cosmos has none but localStorage has
+   reviews, offer to migrate them. */
+async function initReviewsFromCloud(){
+  try{
+    const data = await loadReviewsFromCosmos('mine', 500);
+    const localCount = (function(){ try { return JSON.parse(localStorage.getItem('mck-qa-reviews-pre-migrate')||'[]').length; } catch { return 0; }})();
+    // Migration check — only on first run after deploying cloud persistence
+    const localReviews = (function(){ try { return JSON.parse(localStorage.getItem('mck-qa-reviews')||'[]'); } catch { return []; } })();
+    const alreadyMigrated = localStorage.getItem('mck-qa-migrated') === '1';
+    if(!alreadyMigrated && localReviews.length && data.reviews.length === 0){
+      const ok = confirm(`Found ${localReviews.length} review(s) in this browser's local storage. Move them to the cloud database so they'll show up on every device?\n\nOK = migrate. Cancel = leave them local-only (you can manually export/import via Admin).`);
+      if(ok){
+        // Push each to Cosmos
+        const results = await Promise.allSettled(localReviews.map(r => persistReview(r)));
+        const failed = results.filter(r => r.status === 'rejected' || (r.value && !r.value.ok)).length;
+        localStorage.setItem('mck-qa-migrated','1');
+        if(failed){
+          alert(`Migrated ${localReviews.length - failed} of ${localReviews.length} reviews. ${failed} failed (check console). They remain in local storage.`);
+        } else {
+          alert(`Migrated ${localReviews.length} reviews. They're now in the cloud and visible across devices.`);
+        }
+        // Re-fetch to show what's there now
+        await loadReviewsFromCosmos('mine', 500);
+      } else {
+        // User declined — keep using local-only
+      }
+    }
+  }catch(err){
+    // Cosmos isn't reachable yet — fall back to local-only mode silently
+    console.warn('Cosmos unavailable, using localStorage only:', err.message);
+    cosmosAvailable = false;
+    reviews = loadReviews();
+  }
 }
 
 /* ================== UI: TABS ================== */
@@ -2121,12 +2269,21 @@ function renderChecksChart(){
 }
 
 let recentDateFilter = 'all';
+let recentRowLimit = 10;
 function setRecentDateFilter(f){recentDateFilter = f; renderRecentTable();}
+function setRecentRowLimit(n){recentRowLimit = n; renderRecentTable();}
 
 function renderRecentTable(){
   const tb = document.getElementById('recentBody');
 
-  // Filter pills
+  // Scope filter pills
+  const sp = document.getElementById('recentScopeFilter');
+  if(sp){
+    sp.innerHTML =
+      `<span class="fp ${reviewsScope==='mine'?'active':''}" onclick="setReviewsScope('mine')">Mine</span>` +
+      `<span class="fp ${reviewsScope==='all'?'active':''}" onclick="setReviewsScope('all')">All</span>`;
+  }
+  // Date filter pills
   const fp = document.getElementById('recentDateFilter');
   if(fp){
     fp.innerHTML = ['all','7d','30d','90d','ytd'].map(f=>{
@@ -2158,7 +2315,21 @@ function renderRecentTable(){
     }
   });
 
-  tb.innerHTML = display.slice(0,15).map(item=>{
+  // Update sub line with current state
+  const subEl = document.getElementById('recentSub');
+  if(subEl){
+    const showing = Math.min(display.length, recentRowLimit);
+    subEl.textContent = `Showing ${showing} of ${display.length}${cosmosAvailable?' ('+reviewsScope+')':' (local only)'}.`;
+  }
+  // Highlight the active row-limit pill
+  ['10','25','50','all'].forEach(k => {
+    const el = document.getElementById('rrl-'+k);
+    if(!el)return;
+    const expected = k === 'all' ? 99999 : parseInt(k);
+    el.classList.toggle('active', recentRowLimit === expected);
+  });
+
+  tb.innerHTML = display.slice(0, recentRowLimit).map(item=>{
     if(item.type==='package'){
       const pkg = getPackage(item.packageId);
       if(!pkg)return '';
@@ -2237,7 +2408,14 @@ function renderMyDocs(){
   const totalOwned = docs.length;
 
   document.getElementById('mydocsSub').textContent =
-    `Documents you've submitted for QA. Filter by recency, search, expand any row to see version history.`;
+    reviewsScope === 'mine'
+      ? `Documents you've submitted for QA (${CURRENT_USER}). Switch to "All" to see the whole company.`
+      : `All QA documents across the company. Switch back to "Mine" for your own.`;
+
+  // For "All" scope, include every reviewer's docs (don't filter by CURRENT_USER)
+  if(reviewsScope === 'all'){
+    docs = getDocuments();   // no filter
+  }
 
   // Date filter (uses latest version date)
   const cutoff = dateCutoff(myDocsDateFilter);
@@ -2260,13 +2438,21 @@ function renderMyDocs(){
     return `<span class="fp ${myDocsDateFilter===f?'active':''}" onclick="setMyDocsDateFilter('${f}')">${lbl}</span>`;
   }).join('');
 
+  const scopePills = `
+      <span class="fp ${reviewsScope==='mine'?'active':''}" onclick="setReviewsScope('mine')">Mine (${CURRENT_USER.split(' ')[0]})</span>
+      <span class="fp ${reviewsScope==='all'?'active':''}" onclick="setReviewsScope('all')">All company</span>`;
+
   const toolbar = `
     <div class="mydocs-toolbar">
+      <div class="filter-grp">
+        <span class="grp-lbl">Scope</span>
+        <div class="filter-pills">${scopePills}</div>
+      </div>
       <div class="filter-grp">
         <span class="grp-lbl">Date</span>
         <div class="filter-pills">${filterPills}</div>
       </div>
-      <div class="mydocs-count"><strong>${docs.length}</strong> of ${totalOwned} documents</div>
+      <div class="mydocs-count"><strong>${docs.length}</strong> of ${totalOwned} documents${cosmosAvailable?'':' (local only — cloud unavailable)'}</div>
     </div>`;
 
   if(!docs.length){
@@ -2387,6 +2573,20 @@ function renderProjectRegister(){
   const list = document.getElementById('projectList');
   const q = (document.getElementById('projectSearch').value||'').toLowerCase().trim();
 
+  // Render scope toggle pills
+  const scopePills = document.getElementById('projScopeFilter');
+  if(scopePills){
+    scopePills.innerHTML =
+      `<span class="fp ${reviewsScope==='mine'?'active':''}" onclick="setReviewsScope('mine')">Mine (${escapeHtml(CURRENT_USER.split(' ')[0])})</span>` +
+      `<span class="fp ${reviewsScope==='all'?'active':''}" onclick="setReviewsScope('all')">All company</span>`;
+  }
+  const sub = document.getElementById('projSub');
+  if(sub){
+    sub.textContent = reviewsScope === 'mine'
+      ? `Projects you've QA'd. Switch to "All" to see every project across the company.`
+      : `Every project across the company. Click a project to see its full QA history.`;
+  }
+
   // Group reviews by project number
   const groups = {};
   reviews.forEach(r=>{
@@ -2491,10 +2691,22 @@ function reopenReview(id){
   renderResults(r);
 }
 
-function clearAllReviews(){
-  if(!confirm('Delete all QA reviews? This cannot be undone.'))return;
+async function clearAllReviews(){
+  const scopeWord = reviewsScope === 'mine' ? 'YOUR' : 'ALL';
+  if(!confirm(`Delete ${scopeWord} QA reviews from the cloud database? This cannot be undone.`))return;
+  if(cosmosAvailable){
+    // Delete each from Cosmos in parallel
+    const toDelete = [...reviews];
+    await Promise.allSettled(toDelete.map(r =>
+      fetch('/api/deleteQaReview', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ id: r.id, reviewer: r.reviewer }),
+      })
+    ));
+  }
   reviews = [];
-  saveReviews();
+  saveReviewsLocal();
   renderReports();
 }
 
@@ -2848,10 +3060,24 @@ function importReviews(e){
 /* ================== INIT ================== */
 renderChecks();
 setupDropZone();
-document.getElementById('reviewer').value = CURRENT_USER;
 document.getElementById('reviewDate').value = new Date().toLocaleDateString('en-NZ',{day:'2-digit',month:'short',year:'numeric'});
-// Sync topbar user pill to CURRENT_USER
-document.getElementById('topbarUser').innerHTML = `<span class="a">${reviewerInitials(CURRENT_USER)}</span><span>${CURRENT_USER}</span>`;
+
+// Async init — detect user from AAD, then fetch reviews from Cosmos.
+(async function(){
+  await detectCurrentUser();
+  // Apply detected user everywhere it matters
+  document.getElementById('reviewer').value = CURRENT_USER;
+  document.getElementById('topbarUser').innerHTML = `<span class="a">${reviewerInitials(CURRENT_USER)}</span><span>${CURRENT_USER}</span>`;
+  // Fetch from Cosmos and (if needed) prompt to migrate localStorage data
+  await initReviewsFromCloud();
+  // If a view is already mounted (Reports/MyDocs/Projects), refresh it now that data is loaded
+  const active = document.querySelector('.view.active');
+  if(active){
+    if(active.id === 'view-reports')renderReports();
+    else if(active.id === 'view-mydocs')renderMyDocs();
+    else if(active.id === 'view-projects')renderProjectRegister();
+  }
+})();
 </script>
 </body>
 </html>
