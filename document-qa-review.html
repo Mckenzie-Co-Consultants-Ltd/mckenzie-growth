@@ -2743,31 +2743,34 @@ function saveAdminSettings(){
 
 async function testConnection(){
   const r = document.getElementById('backendStatus');
-  r.className='test-status info';r.style.display='block';r.textContent='Pinging /api/qaReview…';
+  r.className='test-status info';r.style.display='block';r.textContent='Calling Anthropic from inside Azure (via /api/qaPing)…';
   try {
-    const resp = await fetch('/api/qaReview', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({})
-    });
-    if(resp.status === 400){
+    const resp = await fetch('/api/qaPing', { method: 'POST' });
+    let j;
+    try { j = await resp.json(); } catch { j = { error: await resp.text() }; }
+
+    if(resp.status === 200 && j.ok){
       r.className='test-status ok';
-      r.innerHTML = '✓ Backend reachable and ANTHROPIC_API_KEY is configured. Live mode is ready.';
-    } else if(resp.status === 503){
-      const j = await resp.json().catch(()=>({}));
-      r.className='test-status err';
-      r.innerHTML = '⚠️ Backend reachable but not configured: ' + escapeHtml(j.error || 'set ANTHROPIC_API_KEY in Azure SWA → Configuration.');
-    } else if(resp.status === 401 || resp.status === 403){
-      r.className='test-status err';
-      r.innerHTML = '⚠️ Not authenticated. Sign in via AAD and try again.';
-    } else if(resp.status === 404){
-      r.className='test-status err';
-      r.innerHTML = '⚠️ <code>/api/qaReview</code> not found. Has the backend been deployed?';
-    } else {
-      const txt = await resp.text();
-      r.className='test-status err';
-      r.innerHTML = '⚠️ Unexpected response (' + resp.status + '): ' + escapeHtml(txt.slice(0,200));
+      const ki = j.keyInfo || {};
+      r.innerHTML = `✓ Live mode ready. Anthropic returned <code>${escapeHtml(j.reply||'?')}</code> via <code>${escapeHtml(j.model||'?')}</code>.<br>
+        <span style="font-size:.66rem;color:var(--muted)">Key length: ${ki.trimmedLength}, prefix: <code>${escapeHtml(ki.firstChars||'')}</code>${ki.hadWhitespace?' · whitespace was trimmed':''}</span>`;
+      return;
     }
+
+    // Failure path — show full diagnostic
+    r.className='test-status err';
+    let html = `⚠️ Status ${resp.status}: <code>${escapeHtml(j.error || '')}</code>`;
+    if(j.requestId) html += `<br>Anthropic request-id: <code>${escapeHtml(j.requestId)}</code>`;
+    if(j.errorClass) html += `<br>Error class: <code>${escapeHtml(j.errorClass)}</code>`;
+    if(j.anthropicError && j.anthropicError.type) html += `<br>Anthropic error type: <code>${escapeHtml(j.anthropicError.type)}</code>`;
+    if(j.keyInfo){
+      const ki = j.keyInfo;
+      html += `<br><span style="font-size:.66rem">Key in Azure: length ${ki.trimmedLength||0}, starts <code>${escapeHtml(ki.firstChars||'(empty)')}</code>${ki.hadWhitespace?' (had stray whitespace — trimmed)':''}, prefix valid: ${ki.startsCorrectly?'yes':'NO'}</span>`;
+    }
+    if(resp.status === 404){
+      html += `<br><strong>Endpoint not found</strong> — the deploy may not have completed yet.`;
+    }
+    r.innerHTML = html;
   } catch(err){
     r.className='test-status err';
     r.textContent = 'Network error: ' + err.message;

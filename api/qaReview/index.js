@@ -192,12 +192,23 @@ function badRequest(message, status = 400) {
 
 module.exports = async function (context, req) {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    // Trim defensively — pasting into Azure Configuration sometimes picks up
+    // whitespace or a stray newline, which makes Anthropic's edge layer reject
+    // the key with an opaque "Request not allowed" 403.
+    const apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
     if (!apiKey) {
       context.res = {
         status: 503,
         headers: { 'Content-Type': 'application/json' },
         body: { error: 'ANTHROPIC_API_KEY is not configured on the server. Set it in Azure SWA → Configuration.' },
+      };
+      return;
+    }
+    if (!apiKey.startsWith('sk-ant-')) {
+      context.res = {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+        body: { error: 'ANTHROPIC_API_KEY value is not a valid Anthropic key (must start with "sk-ant-"). Re-paste in Azure Configuration.' },
       };
       return;
     }
@@ -252,7 +263,7 @@ module.exports = async function (context, req) {
       checksList
     );
 
-    const client = new Anthropic({ apiKey });
+    const client = new Anthropic({ apiKey });   // already trimmed above
 
     // Stream to avoid HTTP timeouts on long reviews; collect via finalMessage().
     const stream = client.messages.stream({
@@ -302,7 +313,14 @@ module.exports = async function (context, req) {
       },
     };
   } catch (err) {
-    context.log.error('qaReview error:', err.message, err.stack);
+    const detail = {
+      error: err.message || 'Unknown error',
+      errorClass: err && err.constructor ? err.constructor.name : typeof err,
+      status: err.status,
+      requestId: err.request_id || (err.headers && (err.headers['request-id'] || err.headers['x-request-id'])),
+      anthropicError: err.error,
+    };
+    context.log.error('qaReview error:', JSON.stringify(detail), err.stack);
 
     let status = err.status || 500;
     if (err instanceof Anthropic.AuthenticationError) status = 401;
@@ -315,7 +333,7 @@ module.exports = async function (context, req) {
     context.res = {
       status,
       headers: { 'Content-Type': 'application/json' },
-      body: { error: err.message || 'Unknown error' },
+      body: detail,
     };
   }
 };
