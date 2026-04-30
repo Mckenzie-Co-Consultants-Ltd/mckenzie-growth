@@ -899,15 +899,32 @@ async function setReviewsScope(scope){
   }
 }
 
-/* Detect the signed-in user via SWA's /.auth/me endpoint. Best-effort —
-   if AAD isn't configured (local dev), keeps the default CURRENT_USER. */
+/* Detect the signed-in user via SWA's /.auth/me endpoint. If the user is
+   NOT signed in, redirect to AAD login with the current URL as the return
+   destination — so they land back on this page after login (instead of the
+   SWA root). The /document-qa-review.html route is set to anonymous in
+   staticwebapp.config.json specifically to enable this client-side flow. */
 async function detectCurrentUser(){
   try{
     const resp = await fetch('/.auth/me', { credentials:'same-origin' });
-    if(!resp.ok)return;
+    if(!resp.ok){
+      // If /.auth/me is unreachable, this might be local dev (no SWA auth) — keep default.
+      console.log('detectCurrentUser: /.auth/me returned', resp.status, '— continuing with default user');
+      return;
+    }
     const data = await resp.json();
     const principal = Array.isArray(data) ? data[0] : (data.clientPrincipal || null);
-    if(!principal)return;
+
+    if(!principal || !principal.userId){
+      // Not authenticated — redirect to login with this exact URL as return target
+      const returnUrl = window.location.pathname + window.location.search + window.location.hash;
+      const loginUrl = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(returnUrl);
+      console.log('Not signed in. Redirecting to:', loginUrl);
+      window.location.replace(loginUrl);
+      // Throw to halt further init code execution while the redirect happens
+      throw new Error('Redirecting to login…');
+    }
+
     const claims = principal.claims || principal.userClaims || [];
     const nameClaim = claims.find(c => /\bname$/i.test(c.typ) || c.typ === 'name');
     const emailClaim = claims.find(c => /(email|preferred_username|upn)$/i.test(c.typ));
@@ -915,7 +932,8 @@ async function detectCurrentUser(){
     else if(principal.userDetails)CURRENT_USER = principal.userDetails;
     if(emailClaim && emailClaim.val)CURRENT_USER_EMAIL = emailClaim.val;
   }catch(err){
-    // No AAD or network issue — fall back to default
+    if(/Redirecting to login/.test(err.message))throw err;   // re-throw the halt
+    // Other errors (network, no AAD) — silently fall back to default
     console.log('detectCurrentUser: using default CURRENT_USER (', err.message, ')');
   }
 }
