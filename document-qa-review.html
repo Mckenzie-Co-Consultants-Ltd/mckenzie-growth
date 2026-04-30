@@ -996,9 +996,14 @@ const DEFAULT_CHECK_PROMPTS = {
   structure:'Logical heading hierarchy, summary up front, recommendations consolidated.'
 };
 
+/* The deployed Function App that hosts qaReview/qaPing. Hardcoded as the
+   default so every user gets it without admin setup. Override per user via
+   the Admin tab's "QA API base URL" field if needed (e.g. for testing). */
+const DEFAULT_QA_API_BASE = 'https://mck-qa-review.azurewebsites.net';
+
 const DEFAULT_CONFIG = {
   mockMode:false,                      // false = call backend; true = client-side simulation
-  qaApiBase:'',                        // empty = same-origin /api (SWA managed); else full origin like https://mck-qa-api.azurewebsites.net
+  qaApiBase:DEFAULT_QA_API_BASE,       // dedicated Function App that hosts qaReview/qaPing
   model:'claude-opus-4-7',
   maxTokens:16000,
   systemPrompt:DEFAULT_SYSTEM_PROMPT,
@@ -1006,11 +1011,11 @@ const DEFAULT_CONFIG = {
   adminPasswordHash:''
 };
 
-/* Build the full URL for a QA endpoint. If CONFIG.qaApiBase is set, hits the
-   dedicated Function App; otherwise falls back to SWA managed Functions
-   at /api on the current origin. */
+/* Build the full URL for a QA endpoint. Falls back to the hardcoded default
+   if the user's CONFIG.qaApiBase is empty (handles users with stale saved
+   config from before this default was added). */
 function qaApiUrl(name){
-  const base = (CONFIG.qaApiBase || '').replace(/\/+$/, '');
+  const base = ((CONFIG.qaApiBase || DEFAULT_QA_API_BASE) || '').replace(/\/+$/, '');
   return base ? `${base}/api/${name}` : `/api/${name}`;
 }
 
