@@ -27,6 +27,7 @@ module.exports = async function (context, req) {
     if (data.kpiAutoMonthly !== undefined) settingsData.kpiAutoMonthly = data.kpiAutoMonthly;
     if (data.kpiAutoQuarterly !== undefined) settingsData.kpiAutoQuarterly = data.kpiAutoQuarterly;
     if (data.kpiAutoAnnual !== undefined) settingsData.kpiAutoAnnual = data.kpiAutoAnnual;
+    if (data.featureFlags !== undefined) settingsData.featureFlags = data.featureFlags;
     if (Object.keys(settingsData).length > 0) {
       const settingsContainer = database.container('settings');
       await settingsContainer.items.upsert({ id: 'all', data: settingsData });
