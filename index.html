@@ -898,6 +898,35 @@ Sarah Chen,Principal Surveyor,surveying,10+,Survey Operations,,95,195,sarah.chen
   </div>
 </div>
 
+<!-- Modal: Disclosure -->
+<div class="modal-overlay" id="modal-disclosure">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title" id="disc-modal-title">Raise a Concern</div>
+    <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.82rem;color:#5d4037">
+      🔒 Your submission is treated confidentially. Only administrators can view submissions.
+      If you choose to submit anonymously, your name will not be recorded.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Subject *</label>
+      <input class="form-input" id="disc-subject" placeholder="Brief summary of your concern…"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description *</label>
+      <textarea class="form-input" id="disc-description" rows="5" placeholder="Please describe the issue in as much detail as you are comfortable sharing…" style="resize:vertical"></textarea>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem">
+        <input type="checkbox" id="disc-anonymous" style="width:16px;height:16px"/>
+        Submit anonymously — your name will not be attached to this submission
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-disclosure')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDisclosure()">Submit</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: KPI -->
 <div class="modal-overlay" id="modal-kpi">
   <div class="modal" style="max-width:480px">
@@ -1836,11 +1865,121 @@ function deleteDesignatedExpert(id){if(!confirm('Remove this designated expert?'
 // DISCLOSURES (stub — feature coming soon)
 // ══════════════════════════════════════════════════════════
 function renderDisclosures(){
+  const u=S.currentUser;if(!u)return;
+  const isAdmin=S.adminUnlocked;
+  // Staff see only their own; admins see all
+  const mine=S.disclosures.filter(d=>d.userId===u.id).sort((a,b)=>b.date.localeCompare(a.date));
+  const all=isAdmin?[...S.disclosures].sort((a,b)=>b.date.localeCompare(a.date)):[];
+  const contact=S.disclosureContact||'your administrator';
+  const STATUS_STYLE={pending:'badge-amber',reviewing:'badge-teal',resolved:'badge-green',closed:'badge-grey'};
+
   document.getElementById('view-disclosures').innerHTML=`
     <div class="page-title">Raise a Concern</div>
-    <div class="page-sub">Confidential reporting — coming soon</div>
-    <div class="empty-state"><div class="empty-icon">🔒</div><p>This feature is being set up.<br>In the meantime, please speak directly with your manager or director.</p></div>
+    <div class="page-sub" style="display:flex;align-items:center;gap:10px">
+      Confidential reporting channel
+      <span class="badge badge-green" style="font-size:.7rem">🔒 Confidential</span>
+    </div>
+
+    ${!isAdmin?`<div class="card" style="padding:16px;background:var(--sand-pale);margin-bottom:20px;font-size:.84rem;color:var(--muted);line-height:1.6">
+      Your concern is submitted confidentially${contact?` and reviewed by <strong>${esc(contact)}</strong>`:''}. Only authorised administrators can view submissions.
+    </div>`:''}
+
+    <div style="margin-bottom:20px">
+      <button class="btn btn-primary" onclick="openDisclosureModal()">+ Raise a Concern</button>
+    </div>
+
+    ${isAdmin&&all.length?`
+    <div class="section-header" style="margin-bottom:12px"><h3>All Submissions (${all.length})</h3></div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:28px">
+      ${all.map(d=>{
+        const submitter=S.users.find(x=>x.id===d.userId);
+        return`<div class="card" style="padding:14px 16px">
+          <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                <strong style="font-size:.9rem">${esc(d.subject)}</strong>
+                <span class="badge ${STATUS_STYLE[d.status]||'badge-grey'}">${cap(d.status||'pending')}</span>
+                ${d.anonymous?'<span class="badge badge-grey" style="font-size:.68rem">Anonymous</span>':''}
+              </div>
+              <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px">
+                📅 ${fmtDate(d.date)} · ${d.anonymous?'Anonymous submission':esc(submitter?.name||'Unknown')}
+              </div>
+              <div style="font-size:.84rem;white-space:pre-wrap;color:var(--wood)">${esc(d.description)}</div>
+              ${d.adminNotes?`<div style="margin-top:10px;padding:8px 12px;background:var(--sand-pale);border-radius:5px;font-size:.78rem"><strong>Admin notes:</strong> ${esc(d.adminNotes)}</div>`:''}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+              <select class="form-select" style="font-size:.78rem;padding:4px 8px;margin:0" onchange="updateDisclosureStatus('${d.id}',this.value)">
+                ${['pending','reviewing','resolved','closed'].map(s=>`<option value="${s}" ${d.status===s?'selected':''}>${cap(s)}</option>`).join('')}
+              </select>
+              <button class="btn btn-secondary btn-sm" onclick="openDisclosureAdminNote('${d.id}')">📝 Notes</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`:''}
+
+    ${mine.length?`
+    <div class="section-header" style="margin-bottom:12px"><h3>${isAdmin?'Your Submissions':'My Submissions'} (${mine.length})</h3></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${mine.map(d=>`<div class="card" style="padding:14px 16px">
+        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+              <strong style="font-size:.88rem">${esc(d.subject)}</strong>
+              <span class="badge ${STATUS_STYLE[d.status]||'badge-grey'}">${cap(d.status||'pending')}</span>
+            </div>
+            <div style="font-size:.75rem;color:var(--muted);margin-bottom:6px">Submitted ${fmtDate(d.date)}</div>
+            <div style="font-size:.82rem;white-space:pre-wrap">${esc(d.description)}</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="deleteDisclosure('${d.id}')">✕</button>
+        </div>
+      </div>`).join('')}
+    </div>
+    `:`<div class="empty-state"><div class="empty-icon">🔒</div><p>You haven't raised any concerns yet.</p></div>`}
   `;
+}
+
+function openDisclosureModal(){
+  document.getElementById('disc-subject').value='';
+  document.getElementById('disc-description').value='';
+  document.getElementById('disc-anonymous').checked=false;
+  document.getElementById('modal-disclosure').classList.add('open');
+}
+
+function saveDisclosure(){
+  const subject=document.getElementById('disc-subject').value.trim();
+  const description=document.getElementById('disc-description').value.trim();
+  if(!subject||!description){alert('Please fill in subject and description.');return;}
+  const anon=document.getElementById('disc-anonymous').checked;
+  S.disclosures.push({
+    id:'disc'+Date.now(),
+    userId:S.currentUser.id,
+    date:new Date().toISOString().split('T')[0],
+    subject,description,
+    anonymous:anon,
+    status:'pending',
+    adminNotes:''
+  });
+  save();closeModal('modal-disclosure');renderDisclosures();
+  showToast('Concern submitted confidentially ✓');
+}
+
+function deleteDisclosure(id){
+  if(!confirm('Delete this submission?'))return;
+  S.disclosures=S.disclosures.filter(d=>d.id!==id);
+  save();renderDisclosures();
+}
+
+function updateDisclosureStatus(id,status){
+  const d=S.disclosures.find(x=>x.id===id);if(!d)return;
+  d.status=status;save();renderDisclosures();
+}
+
+function openDisclosureAdminNote(id){
+  const d=S.disclosures.find(x=>x.id===id);if(!d)return;
+  const note=prompt('Admin notes (internal only, not shown to submitter):',d.adminNotes||'');
+  if(note===null)return;
+  d.adminNotes=note;save();renderDisclosures();
 }
 
 // ══════════════════════════════════════════════════════════

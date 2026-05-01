@@ -9,7 +9,8 @@ module.exports = async function (context, req) {
     }
 
     // Core data collections — each wrapped individually so one failure doesn't block the rest
-    const collections = ['users', 'materials', 'assignments', 'reviews', 'onetoones', 'cpdLog', 'disclosures', 'docs'];
+    // docs and disclosures live in the settings document (no separate container needed)
+    const collections = ['users', 'materials', 'assignments', 'reviews', 'onetoones', 'cpdLog'];
 
     for (const name of collections) {
       if (data[name] !== undefined) {
@@ -29,6 +30,8 @@ module.exports = async function (context, req) {
     if (data.resources !== undefined) settingsData.resources = data.resources;
     if (data.technicalExperts !== undefined) settingsData.technicalExperts = data.technicalExperts;
     if (data.disclosureContact !== undefined) settingsData.disclosureContact = data.disclosureContact;
+    if (data.disclosures !== undefined) settingsData.disclosures = data.disclosures;
+    if (data.docs !== undefined) settingsData.docs = data.docs;
     if (data.kpis !== undefined) settingsData.kpis = data.kpis;
     if (data.reportRecipients !== undefined) settingsData.reportRecipients = data.reportRecipients;
     if (data.kpiAutoMonthly !== undefined) settingsData.kpiAutoMonthly = data.kpiAutoMonthly;
