@@ -2163,7 +2163,91 @@ function viewMaterial(id){const mat=S.materials.find(m=>m.id===id);if(!mat)retur
 let pushTab='all';
 function openPushModal(matId){const mat=S.materials.find(m=>m.id===matId);if(!mat)return;document.getElementById('push-mat-id').value=matId;document.getElementById('push-mat-preview').innerHTML=`<strong>${TYPE_ICONS[mat.type]||'📄'} ${mat.title}</strong> <span class="badge badge-green">${mat.skill}</span>`;document.getElementById('push-message').value='';document.getElementById('push-due').value='';document.getElementById('push-all-count').textContent=S.users.length;pushTab='all';document.querySelectorAll('#modal-push .tab').forEach((t,i)=>{t.classList.toggle('active',i===0);});document.getElementById('push-target-all').style.display='';document.getElementById('push-target-team').style.display='none';document.getElementById('push-target-individual').style.display='none';const teams=[...new Set(S.users.map(u=>u.team||'No Team'))].sort();document.getElementById('push-team-list').innerHTML=teams.map(t=>`<label class="push-target-btn"><input type="checkbox" value="${t}" checked/><span>${t}</span><span class="text-xs text-muted ml-auto">${S.users.filter(u=>(u.team||'No Team')===t).length}</span></label>`).join('');document.getElementById('push-individual-list').innerHTML=S.users.map(u=>`<label class="push-target-btn"><input type="checkbox" value="${u.id}" checked/><div class="p-avatar" style="width:26px;height:26px;font-size:.65rem">${ini(u.name)}</div><div style="flex:1"><div style="font-weight:600;font-size:.82rem">${u.name}</div><div class="text-xs text-muted">${u.role}</div></div></label>`).join('');document.getElementById('modal-push').classList.add('open');}
 function switchPushTab(tab,el){pushTab=tab;document.querySelectorAll('#modal-push .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.getElementById('push-target-all').style.display=tab==='all'?'':'none';document.getElementById('push-target-team').style.display=tab==='team'?'':'none';document.getElementById('push-target-individual').style.display=tab==='individual'?'':'none';}
-function executePush(){const matId=document.getElementById('push-mat-id').value;const message=document.getElementById('push-message').value.trim();const dueDate=document.getElementById('push-due').value;let ids=[];if(pushTab==='all')ids=S.users.map(u=>u.id);else if(pushTab==='team'){const ct=[...document.querySelectorAll('#push-team-list input:checked')].map(c=>c.value);ids=S.users.filter(u=>ct.includes(u.team||'No Team')).map(u=>u.id);}else ids=[...document.querySelectorAll('#push-individual-list input:checked')].map(c=>c.value);if(!ids.length){alert('Select at least one person.');return;}const by=S.currentUser?S.currentUser.name:'Admin';const today=new Date().toISOString().split('T')[0];ids.forEach(uid=>{if(!S.assignments.find(a=>a.matId===matId&&a.userId===uid&&a.status==='pending'))S.assignments.push({id:'a'+Date.now()+uid,matId,userId:uid,assignedBy:by,assignedAt:today,dueDate,message,status:'pending'});});save();updateAssignedBadge();closeModal('modal-push');alert(`Course pushed to ${ids.length} staff.`);}
+async function executePush(){
+  const matId=document.getElementById('push-mat-id').value;
+  const message=document.getElementById('push-message').value.trim();
+  const dueDate=document.getElementById('push-due').value;
+  let ids=[];
+  if(pushTab==='all')ids=S.users.map(u=>u.id);
+  else if(pushTab==='team'){const ct=[...document.querySelectorAll('#push-team-list input:checked')].map(c=>c.value);ids=S.users.filter(u=>ct.includes(u.team||'No Team')).map(u=>u.id);}
+  else ids=[...document.querySelectorAll('#push-individual-list input:checked')].map(c=>c.value);
+  if(!ids.length){alert('Select at least one person.');return;}
+
+  const mat=S.materials.find(m=>m.id===matId);
+  const by=S.currentUser?S.currentUser.name:'Admin';
+  const today=new Date().toISOString().split('T')[0];
+
+  // Create assignments — track which ones are new (skip already-pending)
+  const newlyAssigned=[];
+  ids.forEach(uid=>{
+    if(!S.assignments.find(a=>a.matId===matId&&a.userId===uid&&a.status==='pending')){
+      S.assignments.push({id:'a'+Date.now()+Math.random().toString(36).slice(2),matId,userId:uid,assignedBy:by,assignedAt:today,dueDate,message,status:'pending'});
+      newlyAssigned.push(uid);
+    }
+  });
+  save();updateAssignedBadge();
+
+  // Show sending state on button
+  const btn=document.querySelector('#modal-push .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='Sending emails…';}
+
+  // Email each newly-assigned user who has an email address
+  const toEmail=S.users.filter(u=>newlyAssigned.includes(u.id)&&u.email);
+  let sent=0;
+  if(toEmail.length){
+    await Promise.all(toEmail.map(async u=>{
+      try{
+        const res=await fetch('/api/sendReport',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            subject:`New course assigned: ${mat?.title||'Course'}`,
+            to:[u.email],
+            html:buildAssignmentEmail(u,mat,dueDate,message,by)
+          })});
+        if((await res.json()).ok)sent++;
+      }catch(e){console.warn('Assignment email failed for',u.name,e);}
+    }));
+  }
+
+  if(btn){btn.disabled=false;btn.textContent='Push Course';}
+  closeModal('modal-push');
+
+  const skipped=ids.length-newlyAssigned.length;
+  let msg=`Pushed to ${newlyAssigned.length} staff`;
+  if(skipped)msg+=` (${skipped} already assigned, skipped)`;
+  if(toEmail.length)msg+=` · ${sent}/${toEmail.length} email${toEmail.length!==1?'s':''} sent`;
+  else if(newlyAssigned.length)msg+=' · No email addresses on file';
+  showToast(msg);
+}
+
+function buildAssignmentEmail(user,mat,dueDate,message,by){
+  const e=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const site=window.location.origin;
+  const dueLine=dueDate?`📅 Due: <strong>${new Date(dueDate+'T12:00:00').toLocaleDateString('en-NZ',{day:'numeric',month:'long',year:'numeric'})}</strong> &nbsp;·&nbsp; `:'';
+  return`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+body{font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#3d3935}
+h1{color:#48773c;font-size:1.15rem;margin:0 0 4px}
+.sub{color:#888;font-size:.85rem;margin-bottom:20px}
+.card{background:#f5f3ee;border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.badge{display:inline-block;padding:2px 10px;border-radius:10px;font-size:.72rem;font-weight:600;background:#abc6ca;color:#1a4a4e;margin-right:4px}
+.msg-card{border-left:3px solid #48773c;background:#f5f3ee;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px}
+.cta{display:inline-block;padding:11px 24px;background:#48773c;color:#fff;text-decoration:none;border-radius:6px;font-weight:700;font-size:.88rem;margin-top:4px}
+.foot{font-size:.7rem;color:#aaa;border-top:1px solid #e8e4dc;padding-top:12px;margin-top:20px}
+</style></head><body>
+<h1>You've been assigned a new course</h1>
+<div class="sub">Hi ${e(user.name)} — ${e(by)} has assigned you a course on McKenzie Growth.</div>
+<div class="card">
+  <div style="font-weight:700;font-size:1rem;margin-bottom:8px">${e(mat?.title||'New Course')}</div>
+  ${mat?.skill?`<span class="badge">${e(mat.skill)}</span>`:''}
+  ${mat?.type?`<span class="badge" style="background:#d2cdbe;color:#3d3935">${e(mat.type)}</span>`:''}
+  ${mat?.description?`<div style="font-size:.82rem;color:#666;margin-top:10px;line-height:1.5">${e(mat.description)}</div>`:''}
+  <div style="font-size:.78rem;color:#888;margin-top:12px">${dueLine}Assigned by ${e(by)}</div>
+</div>
+${message?`<div class="msg-card"><div style="font-size:.73rem;color:#888;font-weight:600;margin-bottom:5px">MESSAGE FROM ${e(by).toUpperCase()}</div><div style="font-size:.88rem;line-height:1.5">${e(message)}</div></div>`:''}
+<a href="${site}" class="cta">Open McKenzie Growth →</a>
+${mat?.url?`<div style="margin-top:12px"><a href="${e(mat.url)}" style="color:#48773c;font-size:.82rem">Direct link to course material →</a></div>`:''}
+<div class="foot">McKenzie Growth · You received this because a course was assigned to you by ${e(by)}.</div>
+</body></html>`;
+}
 
 // ══════════════════════════════════════════════════════════
 // SKILLS MATRIX (Admin)
