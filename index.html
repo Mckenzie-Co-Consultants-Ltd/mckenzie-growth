@@ -1951,7 +1951,7 @@ function saveDisclosure(){
   const description=document.getElementById('disc-description').value.trim();
   if(!subject||!description){alert('Please fill in subject and description.');return;}
   const anon=document.getElementById('disc-anonymous').checked;
-  S.disclosures.push({
+  const disc={
     id:'disc'+Date.now(),
     userId:S.currentUser.id,
     date:new Date().toISOString().split('T')[0],
@@ -1959,9 +1959,31 @@ function saveDisclosure(){
     anonymous:anon,
     status:'pending',
     adminNotes:''
-  });
+  };
+  S.disclosures.push(disc);
   save();closeModal('modal-disclosure');renderDisclosures();
   showToast('Concern submitted confidentially ✓');
+  // Notify admin
+  const submitterName=anon?'Anonymous':esc(S.currentUser.name||'A staff member');
+  fetch('/api/sendReport',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      subject:`[McKenzie Growth] New concern raised: ${subject}`,
+      to:['james@mccl.co.nz'],
+      html:`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#3d3935">
+        <h2 style="color:#48773c;margin:0 0 4px">New Concern Raised</h2>
+        <p style="color:#888;font-size:.85rem;margin:0 0 20px">${new Date().toLocaleDateString('en-NZ',{day:'numeric',month:'long',year:'numeric'})}</p>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+          <tr><td style="padding:8px 12px;background:#f5f3ee;font-size:.83rem;width:130px;font-weight:700">From</td>
+              <td style="padding:8px 12px;background:#f5f3ee;font-size:.83rem">${submitterName}</td></tr>
+          <tr><td style="padding:8px 12px;font-size:.83rem;font-weight:700">Subject</td>
+              <td style="padding:8px 12px;font-size:.83rem">${subject}</td></tr>
+          <tr><td style="padding:8px 12px;background:#f5f3ee;font-size:.83rem;vertical-align:top;font-weight:700">Description</td>
+              <td style="padding:8px 12px;background:#f5f3ee;font-size:.83rem;white-space:pre-wrap">${description}</td></tr>
+        </table>
+        <p style="font-size:.8rem;color:#888">Log in to McKenzie Growth to review and update the status of this submission.</p>
+      </body></html>`
+    })
+  }).catch(e=>console.warn('Disclosure notification email failed:',e));
 }
 
 function deleteDisclosure(id){
