@@ -1120,7 +1120,7 @@ let _editingCareerHistory=[];
 let _saveTimer=null;
 
 function save(){
-  // Always save to localStorage as cache
+  // localStorage — fast-load cache only, Azure Cosmos DB is the source of truth
   localStorage.setItem('mck_users',JSON.stringify(S.users));
   localStorage.setItem('mck_materials',JSON.stringify(S.materials));
   localStorage.setItem('mck_assignments',JSON.stringify(S.assignments));
@@ -1128,24 +1128,31 @@ function save(){
   localStorage.setItem('mck_onetoones',JSON.stringify(S.onetoones));
   localStorage.setItem('mck_skills',JSON.stringify(S.skillsCatalog));
   localStorage.setItem('mck_resources',JSON.stringify(S.resources));
-  localStorage.setItem('mck_cpdlog', JSON.stringify(S.cpdLog));
-  localStorage.setItem('mck_techexperts', JSON.stringify(S.technicalExperts));
-  localStorage.setItem('mck_disclosures', JSON.stringify(S.disclosures));
-  localStorage.setItem('mck_disccontact', S.disclosureContact||'');
-  localStorage.setItem('mck_docs', JSON.stringify(S.docs));
-  localStorage.setItem('mck_kpis', JSON.stringify(S.kpis));
-  localStorage.setItem('mck_report_recipients', S.reportRecipients||'');
-  localStorage.setItem('mck_kpi_auto', JSON.stringify({monthly:S.kpiAutoMonthly,quarterly:S.kpiAutoQuarterly,annual:S.kpiAutoAnnual}));
-  localStorage.setItem('mck_feature_flags', JSON.stringify(S.featureFlags||{}));
-  // Debounce API saves (300ms) so rapid changes don't flood the server
-  if(_useAPI){
-    clearTimeout(_saveTimer);
-    _saveTimer=setTimeout(()=>{
-      fetch('/api/saveData',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({users:S.users,materials:S.materials,assignments:S.assignments,reviews:S.reviews,onetoones:S.onetoones,skillsCatalog:S.skillsCatalog,resources:S.resources,cpdLog:S.cpdLog,technicalExperts:S.technicalExperts,disclosures:S.disclosures,disclosureContact:S.disclosureContact,docs:S.docs,kpis:S.kpis,reportRecipients:S.reportRecipients,kpiAutoMonthly:S.kpiAutoMonthly,kpiAutoQuarterly:S.kpiAutoQuarterly,kpiAutoAnnual:S.kpiAutoAnnual,featureFlags:S.featureFlags})
-      }).catch(err=>console.warn('API save failed, data safe in localStorage:',err));
-    },300);
-  }
+  localStorage.setItem('mck_cpdlog',JSON.stringify(S.cpdLog));
+  localStorage.setItem('mck_techexperts',JSON.stringify(S.technicalExperts));
+  localStorage.setItem('mck_disclosures',JSON.stringify(S.disclosures));
+  localStorage.setItem('mck_disccontact',S.disclosureContact||'');
+  localStorage.setItem('mck_docs',JSON.stringify(S.docs));
+  localStorage.setItem('mck_kpis',JSON.stringify(S.kpis));
+  localStorage.setItem('mck_report_recipients',S.reportRecipients||'');
+  localStorage.setItem('mck_kpi_auto',JSON.stringify({monthly:S.kpiAutoMonthly,quarterly:S.kpiAutoQuarterly,annual:S.kpiAutoAnnual}));
+  localStorage.setItem('mck_feature_flags',JSON.stringify(S.featureFlags||{}));
+  // Azure Cosmos DB save — always attempted, debounced 300ms to batch rapid changes.
+  // NOT gated on _useAPI so saves always reach the DB regardless of load state.
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(()=>{
+    fetch('/api/saveData',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        users:S.users,materials:S.materials,assignments:S.assignments,
+        reviews:S.reviews,onetoones:S.onetoones,skillsCatalog:S.skillsCatalog,
+        resources:S.resources,cpdLog:S.cpdLog,technicalExperts:S.technicalExperts,
+        disclosures:S.disclosures,disclosureContact:S.disclosureContact,
+        docs:S.docs,kpis:S.kpis,reportRecipients:S.reportRecipients,
+        kpiAutoMonthly:S.kpiAutoMonthly,kpiAutoQuarterly:S.kpiAutoQuarterly,
+        kpiAutoAnnual:S.kpiAutoAnnual,featureFlags:S.featureFlags
+      })
+    }).catch(err=>console.warn('Azure DB save failed:',err));
+  },300);
 }
 async function load(){
   // Try API first, fall back to localStorage
