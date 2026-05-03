@@ -3672,7 +3672,7 @@ function getMckLevel(n){return MCK_LEVELS.find(l=>l.level===n)||MCK_LEVELS[0];}
 function getSkillsCatalog(d){const cat=activeCatalog();if(d==='both'){const r={};for(const[c,s]of Object.entries(cat.engineering||{}))r['Eng: '+c]=s;for(const[c,s]of Object.entries(cat.surveying||{}))r['Surv: '+c]=s;return r;}return cat[d]||cat.engineering||{};}
 function getSkillsFlat(d){return Object.values(getSkillsCatalog(d)).flat();}
 function buildPlan(u){const goalSkills=new Set();(u.goals||[]).filter(g=>g.status!=='completed').forEach(g=>{if(g.skills)g.skills.split(',').map(s=>s.trim()).filter(Boolean).forEach(s=>goalSkills.add(s));});const gaps=[];getSkillsFlat(u.discipline).forEach(skill=>{const score=(u.skills||{})[skill]||0;if(score>0&&score<=3)gaps.push({skill,score,goalLinked:goalSkills.has(skill)});else if(score===0&&goalSkills.has(skill))gaps.push({skill,score:0,goalLinked:true});});return gaps.sort((a,b)=>(b.goalLinked-a.goalLinked)||a.score-b.score);}
-function topGaps(u,n){return Object.entries(u.skills||{}).filter(([,v])=>v<=2).sort((a,b)=>a[1]-b[1]).slice(0,n).map(([skill,score])=>({skill,score}));}
+function topGaps(u,n){const catalogSkills=new Set(getSkillsFlat(u.discipline));return Object.entries(u.skills||{}).filter(([skill,v])=>v<=2&&catalogSkills.has(skill)).sort((a,b)=>a[1]-b[1]).slice(0,n).map(([skill,score])=>({skill,score}));}
 function renderDots(level){return`<div class="level-dots">${[1,2,3,4,5].map(n=>`<div class="dot ${n<=level?'filled-'+level:''}"></div>`).join('')}</div>`;}
 function ini(name){return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
 function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
